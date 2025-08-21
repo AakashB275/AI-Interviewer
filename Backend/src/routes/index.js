@@ -1,8 +1,14 @@
 const express = require("express");
+const isLoggedin = require("../middlewares/isLoggedin");
 const router = express.Router();
 
 router.get("/",function(req, res){
-    res.render("index");
+    let error = req.flash("error");
+    res.render("index", {error});
+})
+
+router.get("/home", isLoggedin, function(req,res){
+    res.render("home");
 })
 
 module.exports = router;
