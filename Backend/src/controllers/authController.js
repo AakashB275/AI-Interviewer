@@ -6,10 +6,24 @@ const { generateToken }= require("../utils/generateTokens");
 module.exports.registerUser = async function (req, res) {
     console.log("Registration request received:", req.body);
     try {
+        if (!email || !userName || !password || !contact) {
+            return res.status(400).json({ 
+                success: false,
+                error: "All fields are required" 
+            });
+        }
         let { email, userName, password, contact } = req.body;
 
         let userExist = await userModel.findOne({email:email});
         if(userExist) return res.status(401).send("You aleardy have an account. Please Login")
+
+        let userNameExist = await userModel.findOne({ userName: userName });
+        if (userNameExist) {
+            return res.status(409).json({ 
+                success: false,
+                error: "Username already taken. Please choose another" 
+            });
+        }
         // hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -23,8 +37,13 @@ module.exports.registerUser = async function (req, res) {
         });
 
         let token = generateToken(user);
-        res.cookie("token",token);
         
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
 
         // send back clean response
         return res.status(201).json({
@@ -45,6 +64,12 @@ module.exports.registerUser = async function (req, res) {
 
 module.exports.loginUser = async function(req, res){
     try {
+        if (!userName || !password) {
+            return res.status(400).json({ 
+                success: false,
+                error: "Username and password are required" 
+            });
+        }
         let { userName, password } = req.body;
 
         let user = await userModel.findOne({ userName });
@@ -67,7 +92,12 @@ module.exports.loginUser = async function(req, res){
 
         // Generate token and send success response
         let token = generateToken(user);
-        res.cookie("token", token);
+         res.cookie("token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
         
         return res.status(200).json({
             message: "Login successful",
@@ -85,3 +115,34 @@ module.exports.loginUser = async function(req, res){
     }
 }
 
+module.exports.logoutUser = async function(req, res) {
+    try {
+        res.clearCookie("token");
+        return res.status(200).json({
+            success: true,
+            message: "Logged out successfully"
+        });
+    } catch (err) {
+        console.error("Error in logout:", err.message);
+        return res.status(500).json({ 
+            success: false,
+            error: err.message 
+        });
+    }
+}
+
+module.exports.getCurrentUser = async function(req, res) {
+    try {
+        // req.user is set by the isLoggedIn middleware
+        return res.status(200).json({
+            success: true,
+            user: req.user
+        });
+    } catch (err) {
+        console.error("Error getting current user:", err.message);
+        return res.status(500).json({ 
+            success: false,
+            error: err.message 
+        });
+    }
+}
