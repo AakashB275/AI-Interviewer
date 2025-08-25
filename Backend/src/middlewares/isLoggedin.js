@@ -19,6 +19,14 @@ module.exports = async function(req,res, next){
         next();
     }
     catch(error){
+        console.error("JWT verification error:", error);
+        
+        if (req.path.startsWith('/api/')) {
+            return res.status(401).json({
+                success: false,
+                error: "Invalid token. Please login again."
+            });
+        }
         req.flash("error", "something went wrong");
         req.redirect("/");
     }

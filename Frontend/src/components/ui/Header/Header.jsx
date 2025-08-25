@@ -18,6 +18,8 @@ function Header() {
   const [isSignUpCardOpen ,setIsSignUpCardOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
+  
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);

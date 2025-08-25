@@ -1,68 +1,84 @@
-require("dotenv").config();
 const express = require("express");
 const app = express();
-const db = require("./config/mongoose-connect");
 const cookieParser = require("cookie-parser");
 const path = require("path");
-const usersRouter = require("./src/routes/usersRouter");
+const db = require("./config/mongoose-connect");
+const cors = require('cors');
+
+// Import routes
 const indexRouter = require("./src/routes/index");
-const config = require("config");
-const dbauth = config.get("MONGODB_URI");
-const expressSession = require("express-session");
-const flash = require("connect-flash");
-const cors = require("cors");
+const usersRouter = require("./src/routes/usersRouter");
 const contactRouter = require("./src/routes/contactRouter");
+const uploadRouter = require("./src/routes/uploadRouter"); // New upload router
 
-
-console.log("Using DB URI:", dbauth);
-
+// Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // Your React dev server URL
-  credentials: true // Allow cookies to be sent
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({extended: true}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
-app.use(
-    expressSession({
-        resave: false,
-        saveUninitialized: false,
-        secret: process.env.SESSION_SECRET, // Changed from EXPRESS_SESSION_SECRET to SESSION_SECRET
-        cookie: {
-            secure: false, // Set to true in production with HTTPS
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        }
-    })
-);
-app.use(flash());
-// app.use(express.static(path.join(__dirname, "public")));
-// app.set("view engine", "ejs");
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API Routes
-app.use('/api/users', usersRouter);
-app.use('/api', indexRouter);
+// Set view engine
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "src", "views"));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
+// Routes
+app.use("/", indexRouter);
+app.use("/users", usersRouter);
+app.use("/api/contact", contactRouter);
+app.use("/api/upload", uploadRouter); // New upload API routes
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error("Global error handler:", error);
+  
+  // Handle multer errors
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: 'File size too large. Maximum size is 10MB per file.'
+      });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many files. Maximum 5 files allowed per upload.'
+      });
+    }
+  }
+  
+  // Handle other file upload errors
+  if (error.message.includes('Invalid file type')) {
+    return res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+  
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error'
+  });
 });
 
-app.use("/api/contact", contactRouter);
-
-
-// Serve static files from React build (for production)
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../Frontend/dist')));
-  
-  // Handle React routing, return all requests to React app
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../Frontend/dist/index.html'));
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
   });
-}
+});
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Upload directory: ${path.join(__dirname, 'uploads/user-data')}`);
 });
