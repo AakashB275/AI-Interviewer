@@ -1,5 +1,0 @@
-{
-  "MONGODB_URI": "mongodb+srv://borjiaakash7089:e7FpLB8GYHHxJyFx@trainmeai.lj3jzac.mongodb.net/",
-  "PORT": 3000,
-  "NODE_ENV": "development"
-}
