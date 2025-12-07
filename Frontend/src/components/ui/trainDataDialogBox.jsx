@@ -46,13 +46,27 @@ function TrainAIDialog({ isOpen, onClose }) {
       const response = await fetch('/api/upload/status', {
         credentials: 'include'
       });
+      
+      // Check if response is OK and content type is JSON
+      if (!response.ok) {
+        console.warn('Training status endpoint returned non-OK status:', response.status);
+        return;
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Training status endpoint returned non-JSON response');
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success) {
         setTrainingStatus(data);
       }
     } catch (error) {
-      console.error('Error fetching training status:', error);
+      // Silently handle errors - API might not be available
+      console.warn('Training status not available:', error.message);
     }
   };
 
@@ -198,7 +212,7 @@ function TrainAIDialog({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <Card className="bg-slate-800/95 backdrop-blur-sm border border-white/10">
+        <Card className="bg-gray-300/95 backdrop-blur-sm border border-white/10">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -206,9 +220,9 @@ function TrainAIDialog({ isOpen, onClose }) {
                   <Brain className="text-purple-400" size={24} />
                 </div>
                 <div>
-                  <CardTitle className="text-white">Train Your AI</CardTitle>
-                  <CardDescription className="text-gray-300">
-                    Upload your data to personalize your AI interviewer
+                  <CardTitle className="text-black ml-0">Upload Your Resume</CardTitle>
+                  <CardDescription className="text-black">
+                    Upload your resume to personalize your AI interviewer
                   </CardDescription>
                 </div>
               </div>
@@ -216,7 +230,7 @@ function TrainAIDialog({ isOpen, onClose }) {
                 onClick={onClose}
                 className="p-2 hover:bg-white/10 rounded-full transition-colors"
               >
-                <X className="text-white" size={20} />
+                <X className="text-black" size={20} />
               </button>
             </div>
           </CardHeader>
@@ -237,32 +251,32 @@ function TrainAIDialog({ isOpen, onClose }) {
               </div>
             )}
 
-            {/* Data Type Selection */}
+            {/* Data Type Selection
             <div>
-              <label className="block text-white font-medium mb-2">Data Type</label>
+              <label className="block text-black font-medium mb-2">Data Type</label>
               <select
                 value={dataType}
                 onChange={(e) => setDataType(e.target.value)}
-                className="w-full bg-slate-700/50 border border-white/20 text-white rounded-lg px-3 py-2 focus:border-purple-400 focus:outline-none"
+                className="w-full bg-slate-700/50 border border-white/20 text-black rounded-lg px-3 py-2 focus:border-purple-400 focus:outline-none"
               >
                 <option value="general">General Training Data</option>
                 <option value="resume">Resume/CV</option>
                 <option value="job-description">Job Descriptions</option>
                 <option value="interview-questions">Interview Questions</option>
               </select>
-            </div>
+            </div> */}
 
-            {/* Description */}
+            {/* Description
             <div>
-              <label className="block text-white font-medium mb-2">Description (Optional)</label>
+              <label className="block text-black font-medium mb-2">Description (Optional)</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your training data..."
                 rows="3"
-                className="w-full bg-slate-700/50 border border-white/20 text-white placeholder-gray-400 rounded-lg px-3 py-2 focus:border-purple-400 focus:outline-none resize-none"
+                className="w-full bg-slate-700/50 border border-white/20 text-black placeholder-gray-400 rounded-lg px-3 py-2 focus:border-purple-400 focus:outline-none resize-none"
               />
-            </div>
+            </div> */}
 
             {/* File Upload Area */}
             <div
@@ -276,8 +290,8 @@ function TrainAIDialog({ isOpen, onClose }) {
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
-              <Upload className="text-gray-400 mx-auto mb-4" size={40} />
-              <p className="text-white mb-2">
+              <Upload className="text-black mx-auto mb-4" size={40} />
+              <p className="text-black mb-2">
                 <strong>Drag and drop files here</strong> or click to select
               </p>
               <p className="text-gray-400 text-sm mb-4">
@@ -351,7 +365,7 @@ function TrainAIDialog({ isOpen, onClose }) {
           <CardFooter className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+              className="px-4 py-2 text-black hover:text-black transition-colors"
             >
               Cancel
             </button>

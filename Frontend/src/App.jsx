@@ -2,9 +2,9 @@ import { useState } from 'react'
 import './App.css'
 import { Button } from "@/components/ui/button"
 import { ThemeProvider } from "@/components/ui/theme-provider"
-import Header from './components/ui/Header/Header'
+import Header from './components/Header/Header'
 import Layout from './layout'
-import Footer from './components/ui/Footer/Footer'
+import Footer from './components/Footer/Footer'
 
 
 function App() {

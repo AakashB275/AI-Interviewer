@@ -3,13 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
-import Home from './components/ui/Home/Home'
+import Home from './components/Home/Home'
 import Layout from './layout.jsx'
-import Contact from './components/ui/Contact/Contact.jsx'
-import Users from './components/ui/Users/Users.jsx'
-import LandingPage from './components/ui/Home/landingPage'
-import Reviews from './components/ui/Reviews/Reviews'
-import Pricing from './components/ui/Pricing/Pricing'
+import Contact from './components/Contact/Contact.jsx'
+import Users from './components/Users/Users.jsx'
+import LandingPage from './components/Home/landingPage'
+import Reviews from './components/Reviews/Reviews'
+import Pricing from './components/Pricing/Pricing'
+import InterviewPage from './components/Interview/InterviewPage'
 
 
 const router  = createBrowserRouter(
@@ -27,6 +28,7 @@ const router  = createBrowserRouter(
       <Route path = 'user/:userid' element = {<Users/>}/>
       <Route path = 'reviews' element = {<Reviews/>}/>
       <Route path = 'pricing' element = {<Pricing/>}/>
+      <Route path = 'interview' element = {<InterviewPage/>}/>
       
     </Route>
     </>
