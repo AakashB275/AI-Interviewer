@@ -14,6 +14,14 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import TrainAIDialog from '../ui/trainDataDialogBox';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from '../ui/card.jsx';
 
 function FeatureCard({ title, description, icon, gradient, delay, onClick, badge, disabled, disabledMessage }) {
   const [isVisible, setIsVisible] = useState(false);
@@ -46,8 +54,7 @@ function FeatureCard({ title, description, icon, gradient, delay, onClick, badge
       onClick={handleClick}
     >
       <div className={`absolute inset-0 ${gradient} ${disabled ? 'opacity-50' : ''}`}></div>
-      
-      {/* Subtle overlay for depth */}
+
       <div className="absolute inset-0 bg-white/5 transition-all duration-300"></div>
       
       
@@ -106,13 +113,17 @@ function StatCard({ icon, label, value, colorClass }) {
 function Home() {
   const [showStats, setShowStats] = useState(false);
   const [isTrainAIDialogOpen, setIsTrainAIDialogOpen] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState({
-    hasUploadedData: false,
-    fileCount: 0,
-    lastUpdated: null
-  });
+  const [isLoginCardOpen, setIsLoginCardOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('authToken');
+    setIsLoggedIn(!!token);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowStats(true), 800);
@@ -120,57 +131,34 @@ function Home() {
   }, []);
 
 
-  useEffect(() => {
-    fetchTrainingStatus();
-  }, []);
-
-  const fetchTrainingStatus = async () => {
-    try {
-      const response = await fetch('/api/upload/status', {
-        credentials: 'include'
-      });
-      
-      // Check if response is OK and content type is JSON
-      if (!response.ok) {
-        console.warn('Training status endpoint returned non-OK status:', response.status);
-        return;
-      }
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('Training status endpoint returned non-JSON response');
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setTrainingStatus(data);
-      }
-    } catch (error) {
-      // Silently handle errors - API might not be available
-      console.warn('Training status not available:', error.message);
-    }
-  };
-
+  
   const handleStartInterview = () => {
+    if (!isLoggedIn) {
+      alert('Please login first to start an interview');
+      setIsLoginCardOpen(true);
+      return;
+    }
     navigate('/interview');
   };
 
   const handleTrainAI = () => {
+    if (!isLoggedIn) {
+      alert('Please login first to upload training data');
+      setIsLoginCardOpen(true);
+      return;
+    }
     console.log('Opening AI training...');
     setIsTrainAIDialogOpen(true);
   };
 
   const handleTrainAIDialogClose = () => {
     setIsTrainAIDialogOpen(false);
-    // Refresh training status after dialog closes
-    fetchTrainingStatus();
   };
 
   const handleViewAnalytics = () => {
-    if (!trainingStatus.hasUploadedData) {
-      alert('Please upload your training data first to view personalized analytics.');
+    if (!isLoggedIn) {
+      alert('Please login first to view analytics');
+      setIsLoginCardOpen(true);
       return;
     }
     console.log('Opening analytics...');
@@ -178,16 +166,31 @@ function Home() {
   };
 
   const handleRecentInterviews = () => {
+    if (!isLoggedIn) {
+      alert('Please login first to view recent interviews');
+      setIsLoginCardOpen(true);
+      return;
+    }
     console.log('Opening recent interviews...');
     alert("Coming soon...");
   };
 
   const handleSettings = () => {
+    if (!isLoggedIn) {
+      alert('Please login first to access settings');
+      setIsLoginCardOpen(true);
+      return;
+    }
     console.log('Opening settings...');
     alert("Settings coming soon...");
   };
 
   const handleQuickTips = () => {
+    if (!isLoggedIn) {
+      alert('Please login first to view interview tips');
+      setIsLoginCardOpen(true);
+      return;
+    }
     console.log('Opening tips...');
     alert("Interview tips coming soon...");
   };
@@ -211,19 +214,18 @@ function Home() {
                 Practice with our advanced AI interviewer, get real-time feedback, and land your dream job with confidence.
               </p>
 
-              {/* Training Status Display */}
+              {/* Upload Resume CTA */}
               <div className="flex justify-center mt-8">
-                {trainingStatus.hasUploadedData ? (
-                  <div className="inline-flex items-center space-x-2 bg-green-50 rounded-full px-6 py-3 text-green-700 border border-green-200">
-                    <Brain size={18} />
-                    <span>AI Training Complete • {trainingStatus.fileCount} files uploaded</span>
-                  </div>
-                ) : (
-                  <div >
-                    {/* <AlertTriangle size={18} /> */}
-                    {/* <span>Upload training data to unlock personalized interviews</span> */}
-                  </div>
-                )}
+                <div className="inline-flex items-center space-x-4 bg-white rounded-full px-6 py-3 text-gray-700 border border-gray-200 shadow-sm">
+                  <Brain size={18} />
+                  <span>Upload your resume to customize your AI interviewer</span>
+                  <button
+                    onClick={handleTrainAI}
+                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                  >
+                    Upload Resume
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -257,7 +259,7 @@ function Home() {
               gradient="bg-purple-100"
               delay={400}
               onClick={handleTrainAI}
-              badge={trainingStatus.hasUploadedData ? "Ready" : "Start Here"}
+              badge={"Start Here"}
             />
             
             <FeatureCard
@@ -268,7 +270,7 @@ function Home() {
               delay={600}
               onClick={handleViewAnalytics}
               badge="Popular"
-              // disabled={!trainingStatus.hasUploadedData}
+              
               
             />
             
@@ -308,6 +310,41 @@ function Home() {
         isOpen={isTrainAIDialogOpen} 
         onClose={handleTrainAIDialogClose}
       />
+
+      {/* Login Card Modal */}
+      {isLoginCardOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-96 bg-slate-800/95 backdrop-blur-sm border border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Login Required</CardTitle>
+              <CardDescription className="text-gray-300">Please login to access this feature</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <input
+                type="username"
+                placeholder="Username"
+                className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded focus:border-blue-400 focus:outline-none"
+              />
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+              <button
+                className="px-4 py-1 rounded bg-slate-600 text-white hover:bg-slate-500 transition"
+                onClick={() => setIsLoginCardOpen(false)}
+              >
+                Cancel
+              </button>
+              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">
+                Login
+              </button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </>
   );
 }

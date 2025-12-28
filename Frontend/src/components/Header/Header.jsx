@@ -18,11 +18,20 @@ function Header() {
   const [isSignUpCardOpen ,setIsSignUpCardOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  
+  useEffect(() => {
+    // Check if user is logged in
+    const token = localStorage.getItem('authToken');
+    setIsLoggedIn(!!token);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setIsLoggedIn(false);
+  };
 
   return (
     <>
@@ -77,16 +86,27 @@ function Header() {
 
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* <ThemeToggle /> */}
-          <button
-            className="px-4 py-1 border bg-blue-500 text-white rounded hover:bg-blue-500/20 transition"
-            onClick={() => setIsLoginCardOpen(true)}
-          >
-            Login
-          </button>
-          <button className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-            onClick={() => setIsSignUpCardOpen(true)}>
-            Sign Up
-          </button>
+          {isLoggedIn ? (
+            <button
+              className="px-4 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          ) : (
+            <>
+              <button
+                className="px-4 py-1 border bg-blue-500 text-white rounded hover:bg-blue-500/20 transition"
+                onClick={() => setIsLoginCardOpen(true)}
+              >
+                Login
+              </button>
+              <button className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                onClick={() => setIsSignUpCardOpen(true)}>
+                Sign Up
+              </button>
+            </>
+          )}
         </div>
       </header>
 
