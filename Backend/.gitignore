@@ -2,3 +2,4 @@ default.json
 development.json
 production.json
 .env
+node_modules

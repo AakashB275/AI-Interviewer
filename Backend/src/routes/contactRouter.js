@@ -1,13 +1,12 @@
-const express = require("express");
-const router = express.Router();
-const isLoggedin = require("../middlewares/isLoggedin");
+import express from 'express';
+import { createContact } from '../controllers/contactController.js';
 
-const {createContact} = require("../controllers/contactController");
+const router = express.Router();
 
 router.get("/", (req, res) => {
     res.send("hey");
 });
 
-router.post("/submit",createContact);
+router.post("/submit", createContact);
 
-module.exports = router;
+export default router;

@@ -1,5 +1,6 @@
-const express = require("express");
-const isLoggedin = require("../middlewares/isLoggedin");
+import express from 'express';
+import isLoggedin from '../middlewares/isLoggedin.js';
+
 const router = express.Router();
 
 // router.get("/", function(req, res){
@@ -15,4 +16,4 @@ router.get("/home", isLoggedin, function(req,res){
     res.render("home");
 })
 
-module.exports = router;
+export default router;

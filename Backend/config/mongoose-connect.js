@@ -1,6 +1,8 @@
-const mongoose = require('mongoose');
-const config = require("config");
-const dbgr = require("debug")("development:mongoose");
+import mongoose from 'mongoose';
+import config from 'config';
+import debug from 'debug';
+
+const dbgr = debug("development:mongoose");
 
 mongoose.connect(config.get("MONGODB_URI"))
 .then(function(){
@@ -10,6 +12,6 @@ mongoose.connect(config.get("MONGODB_URI"))
     dbgr(err);
 })
 
-module.exports = mongoose.connection;
+export default mongoose.connection;
 
 // set DEBUG="development:*"      used to set up environment variables

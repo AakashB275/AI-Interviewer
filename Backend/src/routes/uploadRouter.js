@@ -1,12 +1,8 @@
-const express = require("express");
+import express from 'express';
+import isLoggedIn from '../middlewares/isLoggedin.js';
+import { uploadUserData, getUserTrainingStatus, deleteUserFile, upload } from '../controllers/uploadController.js';
+
 const router = express.Router();
-const isLoggedIn = require("../middlewares/isLoggedin");
-const {
-  uploadUserData,
-  getUserTrainingStatus,
-  deleteUserFile,
-  upload
-} = require("../controllers/uploadController");
 
 // Get user training status
 router.get("/status", isLoggedIn, getUserTrainingStatus);
@@ -22,4 +18,4 @@ router.get("/", (req, res) => {
   res.json({ message: "Upload API is working!" });
 });
 
-module.exports = router;
+export default router;

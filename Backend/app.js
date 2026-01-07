@@ -1,17 +1,25 @@
-const express = require("express");
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import path from 'path';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import indexRouter from './src/routes/index.js';
+import usersRouter from './src/routes/usersRouter.js';
+import contactRouter from './src/routes/contactRouter.js';
+import uploadRouter from './src/routes/uploadRouter.js';
+import { connectDB } from './src/loaders/db.js';
+import multer from 'multer';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
+
 const app = express();
-const cookieParser = require("cookie-parser");
-const path = require("path");
-const db = require("./config/mongoose-connect");
-const cors = require('cors');
 
-// Import routes
-const indexRouter = require("./src/routes/index");
-const usersRouter = require("./src/routes/usersRouter");
-const contactRouter = require("./src/routes/contactRouter");
-const uploadRouter = require("./src/routes/uploadRouter"); // New upload router
-
-// Middleware
+async function bootstrap(){
+// CORS
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
@@ -33,6 +41,8 @@ app.use("/", indexRouter);
 app.use("/users", usersRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/upload", uploadRouter); // New upload API routes
+
+await connectDB();
 
 // Error handling middleware
 app.use((error, req, res, next) => {
@@ -81,4 +91,9 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Upload directory: ${path.join(__dirname, 'uploads/user-data')}`);
+});
+}
+bootstrap().catch((err)=>{
+  console.error("Startup failed:", err);
+  process.exit(1);
 });

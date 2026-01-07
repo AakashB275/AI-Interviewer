@@ -1,7 +1,12 @@
-const multer = require("multer");
-const express = require("express");
-const userModel = require("../models/userModel");
-const fs = require("fs")
+import multer from 'multer';
+import express from 'express';
+import userModel from '../models/userModel.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -38,7 +43,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
+export const upload = multer({
   storage: storage,
   limits: {
     fileSize: 1 * 1024 * 1024, // 1MB limit
@@ -46,7 +51,7 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-module.exports.uploadUserData = async function(req, res, cb) {
+export const uploadUserData = async function(req, res, cb) {
     try{
         if (!req.user) {
       return res.status(401).json({
@@ -131,7 +136,7 @@ module.exports.uploadUserData = async function(req, res, cb) {
   }
 };
 
-module.exports.getUserTrainingStatus = async function (req, res) {
+export const getUserTrainingStatus = async function (req, res) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -168,7 +173,7 @@ module.exports.getUserTrainingStatus = async function (req, res) {
   }
 };
 
-module.exports.deleteUserFile = async function (req, res) {
+export const deleteUserFile = async function (req, res) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -232,6 +237,4 @@ module.exports.deleteUserFile = async function (req, res) {
     });
   }
 };
-
-module.exports.upload = upload;
 

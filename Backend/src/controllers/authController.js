@@ -1,18 +1,19 @@
-const userModel = require("../models/userModel");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { generateToken }= require("../utils/generateTokens");
+import userModel from '../models/userModel.js';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { generateToken } from '../utils/generateTokens.js';
 
-module.exports.registerUser = async function (req, res) {
+export const registerUser = async function (req, res) {
     console.log("Registration request received:", req.body);
     try {
+        const { email, userName, password, contact } = req.body;
+
         if (!email || !userName || !password || !contact) {
             return res.status(400).json({ 
                 success: false,
                 error: "All fields are required" 
             });
         }
-        let { email, userName, password, contact } = req.body;
 
         let userExist = await userModel.findOne({email:email});
         if(userExist) return res.status(401).send("You aleardy have an account. Please Login")
@@ -62,15 +63,16 @@ module.exports.registerUser = async function (req, res) {
     }
 }
 
-module.exports.loginUser = async function(req, res){
+export const loginUser = async function(req, res){
     try {
+        const { userName, password } = req.body;
+
         if (!userName || !password) {
             return res.status(400).json({ 
                 success: false,
                 error: "Username and password are required" 
             });
         }
-        let { userName, password } = req.body;
 
         let user = await userModel.findOne({ userName });
         if (!user) {
@@ -115,7 +117,7 @@ module.exports.loginUser = async function(req, res){
     }
 }
 
-module.exports.logoutUser = async function(req, res) {
+export const logoutUser = async function(req, res) {
     try {
         res.clearCookie("token");
         return res.status(200).json({
@@ -131,7 +133,7 @@ module.exports.logoutUser = async function(req, res) {
     }
 }
 
-module.exports.getCurrentUser = async function(req, res) {
+export const getCurrentUser = async function(req, res) {
     try {
         // req.user is set by the isLoggedIn middleware
         return res.status(200).json({

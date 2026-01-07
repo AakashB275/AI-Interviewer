@@ -1,6 +1,6 @@
-const contactModel = require("../models/contactModel");
+import contactModel from '../models/contactModel.js';
 
-module.exports.createContact = async function (req, res) {
+export const createContact = async function (req, res) {
     console.log("Contact form submission received:", req.body);
     try {
         let { name, email, phone, countryCode, message } = req.body;
