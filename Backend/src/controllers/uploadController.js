@@ -1,6 +1,6 @@
 import multer from 'multer';
 import express from 'express';
-import userModel from '../models/userModel.js';
+import userModel from '../models/user.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

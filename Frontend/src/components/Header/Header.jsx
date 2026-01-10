@@ -17,6 +17,14 @@ function Header() {
   const [isLoginCardOpen, setIsLoginCardOpen] = useState(false);
   const [isSignUpCardOpen ,setIsSignUpCardOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loginForm, setLoginForm] = useState({ userName: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ userName: '', email: '', contact: '', password: '' });
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  async function parseResponseSafe(res) {
+    const txt = await res.text();
+    try { return txt ? JSON.parse(txt) : {}; } catch { return { text: txt }; }
+  }
 
   useEffect(() => {
     // Check if user is logged in
@@ -29,8 +37,11 @@ function Header() {
   }, [darkMode]);
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    setIsLoggedIn(false);
+    // call backend logout and clear local state
+    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
+      localStorage.removeItem('authToken');
+      setIsLoggedIn(false);
+    });
   };
 
   return (
@@ -38,7 +49,7 @@ function Header() {
       <header className="w-full mt-0 px-6 py-4 flex items-center border-b border-white/10 text-white bg-transparent">
         {/* Logo */}
         <div className="flex-shrink-0 text-blue-400 font-bold text-lg">
-          <a href="/home/userid">TrainMeAI</a>
+          <a href="/home">TrainMeAI</a>
         </div>
 
         <nav className="flex-1 flex justify-center gap-12">
@@ -62,6 +73,7 @@ function Header() {
           >
             Reviews
           </NavLink>
+          {isLoggedIn && (
           <NavLink
             to="/user/userid"
             className={({ isActive }) =>
@@ -72,6 +84,7 @@ function Header() {
           >
             Profile
           </NavLink>
+          )}
           <NavLink
             to="/contact"
             className={({ isActive }) =>
@@ -120,11 +133,15 @@ function Header() {
             </CardHeader>
             <CardContent>
               <input
-                type="username"
+                value={loginForm.userName}
+                onChange={e => setLoginForm({...loginForm, userName: e.target.value})}
+                type="text"
                 placeholder="Username"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
               />
               <input
+                value={loginForm.password}
+                onChange={e => setLoginForm({...loginForm, password: e.target.value})}
                 type="password"
                 placeholder="Password"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded focus:border-blue-400 focus:outline-none"
@@ -137,7 +154,23 @@ function Header() {
               >
                 Cancel
               </button>
-              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">
+              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition" onClick={async () => {
+                try {
+                  const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ userName: loginForm.userName, password: loginForm.password })
+                  });
+                  const data = await parseResponseSafe(res);
+                  if (!res.ok) throw new Error(data.error || data.message || 'Login failed');
+                  if (data.token) localStorage.setItem('authToken', data.token);
+                  setIsLoggedIn(true);
+                  setIsLoginCardOpen(false);
+                } catch (err) {
+                  alert(String(err));
+                }
+              }}>
                 Login
               </button>
             </CardFooter>
@@ -153,22 +186,30 @@ function Header() {
             </CardHeader>
             <CardContent>
               <input
-                type="username"
+                value={registerForm.userName}
+                onChange={e => setRegisterForm({...registerForm, userName: e.target.value})}
+                type="text"
                 placeholder="Set Username"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
               />
 
               <input
+                value={registerForm.email}
+                onChange={e => setRegisterForm({...registerForm, email: e.target.value})}
                 type="email"
                 placeholder="Email"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
               />
               <input
-                type="number"
+                value={registerForm.contact}
+                onChange={e => setRegisterForm({...registerForm, contact: e.target.value})}
+                type="text"
                 placeholder="Phone no."
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
               />
               <input
+                value={registerForm.password}
+                onChange={e => setRegisterForm({...registerForm, password: e.target.value})}
                 type="password"
                 placeholder="Set Password"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded focus:border-blue-400 focus:outline-none"
@@ -181,7 +222,23 @@ function Header() {
               >
                 Cancel
               </button>
-              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">
+              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition" onClick={async () => {
+                try {
+                  const res = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ userName: registerForm.userName, email: registerForm.email, contact: registerForm.contact, password: registerForm.password })
+                  });
+                  const data = await parseResponseSafe(res);
+                  if (!res.ok) throw new Error(data.error || data.message || 'Registration failed');
+                  if (data.token) localStorage.setItem('authToken', data.token);
+                  setIsLoggedIn(true);
+                  setIsSignUpCardOpen(false);
+                } catch (err) {
+                  alert(String(err));
+                }
+              }}>
                 SignUp
               </button>
             </CardFooter>

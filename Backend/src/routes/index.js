@@ -3,9 +3,9 @@ import isLoggedin from '../middlewares/isLoggedin.js';
 
 const router = express.Router();
 
-// router.get("/", function(req, res){
-//     res.json({ message: "Welcome to the AI Interviewer Backend API!" });
-// });
+router.get("/", function(req, res){
+    res.json({ message: "Welcome to the AI Interviewer API!" });
+});
 
 router.get("/",function(req, res){
     let error = req.flash("error");

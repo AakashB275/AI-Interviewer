@@ -23,21 +23,12 @@ const documentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Document content is required']
   },
-  embedding: {
-    type: [Number],
-    required: [true, 'Embedding is required'],
-    validate: {
-      validator: function (v) {
-        return Array.isArray(v) && v.length > 0;
-      },
-      message: 'Embedding must be a non-empty array of numbers'
-    }
-  },
-  filetype: {
-    type: String,
-    enum: ['pdf', 'doc', 'docx', 'txt', 'image'],
-    required: true
-  },
+  fileType: {
+  type: String,
+  enum: ["pdf", "doc", "docx"],
+},
+mimeType: String,
+
   originalFileName: {
     type: String,
     required: true
@@ -63,10 +54,8 @@ const documentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Define indexes
 documentSchema.index({ 'metadata.uploadedBy': 1, isActive: 1 });
 documentSchema.index({ 'metadata.tags': 1 });
 documentSchema.index({ createdAt: -1 });
 
-// Export the Document model
 export const DocumentModel = mongoose.model('Document', documentSchema);

@@ -34,6 +34,11 @@ function FeatureCard({ title, description, icon, gradient, delay, onClick, badge
 
   const handleClick = () => {
     if (disabled) {
+      // If a handler exists, call it so it can open a login/upload dialog.
+      if (onClick) {
+        onClick();
+        return;
+      }
       alert(disabledMessage || 'This feature is currently unavailable');
       return;
     }
@@ -115,6 +120,7 @@ function Home() {
   const [isTrainAIDialogOpen, setIsTrainAIDialogOpen] = useState(false);
   const [isLoginCardOpen, setIsLoginCardOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasResume, setHasResume] = useState(false);
   
 
   const navigate = useNavigate();
@@ -123,6 +129,8 @@ function Home() {
     // Check if user is logged in
     const token = localStorage.getItem('authToken');
     setIsLoggedIn(!!token);
+    const uploaded = localStorage.getItem('resumeUploaded') === 'true';
+    setHasResume(uploaded);
   }, []);
 
   useEffect(() => {
@@ -136,6 +144,12 @@ function Home() {
     if (!isLoggedIn) {
       alert('Please login first to start an interview');
       setIsLoginCardOpen(true);
+      return;
+    }
+    // If user hasn't uploaded resume then prompt upload
+    if (!hasResume) {
+      alert('Please upload your resume first to start an interview');
+      setIsTrainAIDialogOpen(true);
       return;
     }
     navigate('/interview');
@@ -153,6 +167,9 @@ function Home() {
 
   const handleTrainAIDialogClose = () => {
     setIsTrainAIDialogOpen(false);
+    // Refresh resume state in case user uploaded during dialog
+    const uploaded = localStorage.getItem('resumeUploaded') === 'true';
+    setHasResume(uploaded);
   };
 
   const handleViewAnalytics = () => {
@@ -250,6 +267,8 @@ function Home() {
               gradient="bg-blue-100"
               delay={200}
               onClick={handleStartInterview}
+              disabled={!isLoggedIn || !hasResume}
+              disabledMessage={!isLoggedIn ? 'Please login first to start an interview' : 'Please upload your resume first to start an interview'}
             />
             
             <FeatureCard

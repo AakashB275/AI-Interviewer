@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import userModel from '../models/userModel.js';
+import userModel from '../models/user.js';
 
 export default async function(req,res, next){
     if(!req.cookies.token){

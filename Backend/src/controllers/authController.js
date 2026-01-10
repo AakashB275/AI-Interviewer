@@ -1,10 +1,13 @@
-import userModel from '../models/userModel.js';
+import userModel from '../models/user.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { generateToken } from '../utils/generateTokens.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET || 'default_secret';
 
 export const registerUser = async function (req, res) {
-    console.log("Registration request received:", req.body);
+    
     try {
         const { email, userName, password, contact } = req.body;
 
@@ -46,15 +49,15 @@ export const registerUser = async function (req, res) {
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
-        // send back clean response
+        // send back clean response and include token for client-side use
         return res.status(201).json({
             message: "User registered successfully",
+            token,
             user: {
                 id: user._id,
                 email: user.email,
                 userName: user.userName,
-                contact: user.contact,
-                // password: user.password 
+                contact: user.contact
             }
         });
     } catch (err) {
@@ -80,29 +83,23 @@ export const loginUser = async function(req, res){
         }
 
         // Compare password
-        const isMatch = await bcrypt.compare(password, user.password, function(err, result){
-            if(result) {
-                let token = generateToken(user);
-                res.cookie("token",token);
-                res.send("you can login");
-            }
-        });
-        
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ error: "Username or Password incorrect" });
         }
 
         // Generate token and send success response
         let token = generateToken(user);
-         res.cookie("token", token, {
+        res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
-        
+
         return res.status(200).json({
             message: "Login successful",
+            token,
             user: {
                 id: user._id,
                 email: user.email,
@@ -147,4 +144,8 @@ export const getCurrentUser = async function(req, res) {
             error: err.message 
         });
     }
+}
+
+function generateToken(user) {
+    return jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 }
