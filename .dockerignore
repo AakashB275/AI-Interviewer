@@ -1,0 +1,31 @@
+.vscode
+.dockerignore
+.git
+.gitignore
+README.md
+
+# Frontend
+Frontend/node_modules
+Frontend/dist
+Frontend/.env
+Frontend/.env.local
+Frontend/.env.*.local
+Frontend/.gitignore
+Frontend/.DS_Store
+
+# Backend
+Backend/node_modules
+Backend/dist
+Backend/.env
+Backend/.env.local
+Backend/.env.*.local
+Backend/.gitignore
+Backend/.DS_Store
+Backend/logs
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+node_modules
+dist

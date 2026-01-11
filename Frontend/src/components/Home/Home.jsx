@@ -1,5 +1,7 @@
+// Frontend/src/components/Home/Home.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Play, 
   Brain, 
@@ -11,7 +13,7 @@ import {
   ArrowRight,
   Sparkles,
   Target,
-  AlertTriangle
+  Lock
 } from 'lucide-react';
 import TrainAIDialog from '../ui/trainDataDialogBox';
 import {
@@ -23,7 +25,7 @@ import {
   CardFooter,
 } from '../ui/card.jsx';
 
-function FeatureCard({ title, description, icon, gradient, delay, onClick, badge, disabled, disabledMessage }) {
+function FeatureCard({ title, description, icon, gradient, delay, onClick, badge, disabled, disabledMessage, showLock }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -33,13 +35,8 @@ function FeatureCard({ title, description, icon, gradient, delay, onClick, badge
   }, [delay]);
 
   const handleClick = () => {
-    if (disabled) {
-      // If a handler exists, call it so it can open a login/upload dialog.
-      if (onClick) {
-        onClick();
-        return;
-      }
-      alert(disabledMessage || 'This feature is currently unavailable');
+    if (disabled && disabledMessage) {
+      alert(disabledMessage);
       return;
     }
     if (onClick) {
@@ -59,10 +56,16 @@ function FeatureCard({ title, description, icon, gradient, delay, onClick, badge
       onClick={handleClick}
     >
       <div className={`absolute inset-0 ${gradient} ${disabled ? 'opacity-50' : ''}`}></div>
-
       <div className="absolute inset-0 bg-white/5 transition-all duration-300"></div>
       
-      
+      {showLock && disabled && (
+        <div className="absolute top-4 left-4 z-20">
+          <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 shadow-sm">
+            <Lock size={14} />
+            Locked
+          </div>
+        </div>
+      )}
       
       <div className="relative z-10 p-8 h-full flex flex-col justify-between min-h-[280px]">
         {badge && !disabled && (
@@ -118,35 +121,49 @@ function StatCard({ icon, label, value, colorClass }) {
 function Home() {
   const [showStats, setShowStats] = useState(false);
   const [isTrainAIDialogOpen, setIsTrainAIDialogOpen] = useState(false);
-  const [isLoginCardOpen, setIsLoginCardOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasResume, setHasResume] = useState(false);
-  
-
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const { isLoggedIn, login } = useAuth();
   const navigate = useNavigate();
 
+  // Check resume status
+  const checkResumeStatus = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/upload/status', {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setHasResume(data.hasUploadedData);
+        localStorage.setItem('resumeUploaded', data.hasUploadedData);
+      }
+    } catch (error) {
+      console.error('Failed to check resume status:', error);
+    }
+  };
+
+  // Check resume status when logged in
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('authToken');
-    setIsLoggedIn(!!token);
-    const uploaded = localStorage.getItem('resumeUploaded') === 'true';
-    setHasResume(uploaded);
-  }, []);
+    if (isLoggedIn) {
+      checkResumeStatus();
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowStats(true), 800);
     return () => clearTimeout(timer);
   }, []);
 
-
-  
   const handleStartInterview = () => {
     if (!isLoggedIn) {
-      alert('Please login first to start an interview');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    // If user hasn't uploaded resume then prompt upload
     if (!hasResume) {
       alert('Please upload your resume first to start an interview');
       setIsTrainAIDialogOpen(true);
@@ -157,58 +174,46 @@ function Home() {
 
   const handleTrainAI = () => {
     if (!isLoggedIn) {
-      alert('Please login first to upload training data');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    console.log('Opening AI training...');
     setIsTrainAIDialogOpen(true);
   };
 
   const handleTrainAIDialogClose = () => {
     setIsTrainAIDialogOpen(false);
-    // Refresh resume state in case user uploaded during dialog
-    const uploaded = localStorage.getItem('resumeUploaded') === 'true';
-    setHasResume(uploaded);
+    checkResumeStatus();
   };
 
   const handleViewAnalytics = () => {
     if (!isLoggedIn) {
-      alert('Please login first to view analytics');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    console.log('Opening analytics...');
     navigate("/user/userid");
   };
 
   const handleRecentInterviews = () => {
     if (!isLoggedIn) {
-      alert('Please login first to view recent interviews');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    console.log('Opening recent interviews...');
-    alert("Coming soon...");
+    alert("Recent interviews coming soon...");
   };
 
   const handleSettings = () => {
     if (!isLoggedIn) {
-      alert('Please login first to access settings');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    console.log('Opening settings...');
     alert("Settings coming soon...");
   };
 
   const handleQuickTips = () => {
     if (!isLoggedIn) {
-      alert('Please login first to view interview tips');
-      setIsLoginCardOpen(true);
+      setIsLoginModalOpen(true);
       return;
     }
-    console.log('Opening tips...');
     alert("Interview tips coming soon...");
   };
 
@@ -232,18 +237,29 @@ function Home() {
               </p>
 
               {/* Upload Resume CTA */}
-              <div className="flex justify-center mt-8">
-                <div className="inline-flex items-center space-x-4 bg-white rounded-full px-6 py-3 text-gray-700 border border-gray-200 shadow-sm">
-                  <Brain size={18} />
-                  <span>Upload your resume to customize your AI interviewer</span>
-                  <button
-                    onClick={handleTrainAI}
-                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                  >
-                    Upload Resume
-                  </button>
+              {!hasResume && (
+                <div className="flex justify-center mt-8">
+                  <div className="inline-flex items-center space-x-4 bg-yellow-50 rounded-full px-6 py-3 text-gray-700 border border-yellow-200 shadow-sm">
+                    <Brain size={18} className="text-yellow-600" />
+                    <span className="font-medium">Upload your resume to unlock AI interviews</span>
+                    <button
+                      onClick={handleTrainAI}
+                      className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition"
+                    >
+                      Upload Now
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {hasResume && (
+                <div className="flex justify-center mt-8">
+                  <div className="inline-flex items-center space-x-4 bg-green-50 rounded-full px-6 py-3 text-gray-700 border border-green-200 shadow-sm">
+                    <Star size={18} className="text-green-600" />
+                    <span className="font-medium">Resume uploaded! You're ready to start interviewing</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Stats Section */}
@@ -267,18 +283,22 @@ function Home() {
               gradient="bg-blue-100"
               delay={200}
               onClick={handleStartInterview}
-              disabled={!isLoggedIn || !hasResume}
-              disabledMessage={!isLoggedIn ? 'Please login first to start an interview' : 'Please upload your resume first to start an interview'}
+              disabled={!hasResume}
+              disabledMessage="Please upload your resume first to unlock AI interviews"
+              showLock={!hasResume}
             />
             
             <FeatureCard
-              title="Upload your Resume"
+              title="Upload Your Resume"
               description="Customize and improve your AI interviewer with specific job roles and requirements"
               icon={<Brain size={32} className="text-purple-600" />}
               gradient="bg-purple-100"
               delay={400}
               onClick={handleTrainAI}
-              badge={"Start Here"}
+              badge={!hasResume ? "Start Here" : "Update"}
+              disabled={!isLoggedIn}
+              disabledMessage="Please login first to upload your resume"
+              showLock={!isLoggedIn}
             />
             
             <FeatureCard
@@ -289,8 +309,9 @@ function Home() {
               delay={600}
               onClick={handleViewAnalytics}
               badge="Popular"
-              
-              
+              disabled={!isLoggedIn}
+              disabledMessage="Please login first to view your analytics"
+              showLock={!isLoggedIn}
             />
             
             <FeatureCard
@@ -300,6 +321,9 @@ function Home() {
               gradient="bg-orange-100"
               delay={800}
               onClick={handleRecentInterviews}
+              disabled={!isLoggedIn}
+              disabledMessage="Please login first to view recent sessions"
+              showLock={!isLoggedIn}
             />
             
             <FeatureCard
@@ -309,6 +333,9 @@ function Home() {
               gradient="bg-yellow-100"
               delay={1000}
               onClick={handleSettings}
+              disabled={!isLoggedIn}
+              disabledMessage="Please login first to access settings"
+              showLock={!isLoggedIn}
             />
             
             <FeatureCard
@@ -330,8 +357,8 @@ function Home() {
         onClose={handleTrainAIDialogClose}
       />
 
-      {/* Login Card Modal */}
-      {isLoginCardOpen && (
+      {/* Login Modal */}
+      {isLoginModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-96 bg-slate-800/95 backdrop-blur-sm border border-white/10">
             <CardHeader>
@@ -340,11 +367,13 @@ function Home() {
             </CardHeader>
             <CardContent>
               <input
-                type="username"
+                id="username-input"
+                type="text"
                 placeholder="Username"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded mb-3 focus:border-blue-400 focus:outline-none"
               />
               <input
+                id="password-input"
                 type="password"
                 placeholder="Password"
                 className="w-full border border-white/20 bg-slate-700/50 text-white placeholder-gray-400 px-3 py-2 rounded focus:border-blue-400 focus:outline-none"
@@ -353,11 +382,46 @@ function Home() {
             <CardFooter className="flex justify-end gap-2">
               <button
                 className="px-4 py-1 rounded bg-slate-600 text-white hover:bg-slate-500 transition"
-                onClick={() => setIsLoginCardOpen(false)}
+                onClick={() => setIsLoginModalOpen(false)}
               >
                 Cancel
               </button>
-              <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">
+              <button 
+                className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition"
+                onClick={async () => {
+                  const username = document.getElementById('username-input')?.value;
+                  const password = document.getElementById('password-input')?.value;
+                  
+                  if (!username || !password) {
+                    alert('Please enter username and password');
+                    return;
+                  }
+
+                  try {
+                    const response = await fetch('/api/auth/login', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userName: username, password }),
+                      credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                      const data = await response.json();
+                      if (data.token) {
+                        login(data.token, data.user);
+                      }
+                      setIsLoginModalOpen(false);
+                      document.getElementById('username-input').value = '';
+                      document.getElementById('password-input').value = '';
+                    } else {
+                      alert('Login failed. Please check your credentials.');
+                    }
+                  } catch (error) {
+                    console.error('Login error:', error);
+                    alert('An error occurred during login.');
+                  }
+                }}
+              >
                 Login
               </button>
             </CardFooter>

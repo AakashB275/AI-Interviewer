@@ -2,12 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, BrowserRouter } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
 import App from './App.jsx'
 import Home from './components/Home/Home'
 import Layout from './layout.jsx'
 import Contact from './components/Contact/Contact.jsx'
 import Users from './components/Users/Users.jsx'
-import LandingPage from './components/Home/landingPage'
+import LandingPage from './components/Home/LandingPage'
 import Reviews from './components/Reviews/Reviews'
 import Pricing from './components/Pricing/Pricing'
 import InterviewPage from './components/Interview/InterviewPage'
@@ -37,6 +38,8 @@ const router  = createBrowserRouter(
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </StrictMode>,
 )

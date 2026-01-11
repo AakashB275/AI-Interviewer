@@ -28,7 +28,6 @@ async function bootstrap(){
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
-app.use(requestLogger);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -37,6 +36,9 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
+app.use(requestLogger);
+
+
 // console.log(`Upload directory: ${path.join(__dirname, 'uploads/user-data')}`);
 console.log('✅ Rate limiting configured');
 

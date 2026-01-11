@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import ThemeToggle from "../ui/theme-toggle";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import {
   Card,
   CardHeader,
@@ -16,9 +17,9 @@ function Header() {
   );
   const [isLoginCardOpen, setIsLoginCardOpen] = useState(false);
   const [isSignUpCardOpen ,setIsSignUpCardOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loginForm, setLoginForm] = useState({ userName: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ userName: '', email: '', contact: '', password: '' });
+  const { isLoggedIn, login, logout } = useAuth();
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   async function parseResponseSafe(res) {
@@ -27,20 +28,13 @@ function Header() {
   }
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('authToken');
-    setIsLoggedIn(!!token);
-  }, []);
-
-  useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
   const handleLogout = () => {
     // call backend logout and clear local state
     fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
-      localStorage.removeItem('authToken');
-      setIsLoggedIn(false);
+      logout();
     });
   };
 
@@ -164,9 +158,11 @@ function Header() {
                   });
                   const data = await parseResponseSafe(res);
                   if (!res.ok) throw new Error(data.error || data.message || 'Login failed');
-                  if (data.token) localStorage.setItem('authToken', data.token);
-                  setIsLoggedIn(true);
+                  if (data.token) {
+                    login(data.token, data.user);
+                  }
                   setIsLoginCardOpen(false);
+                  setLoginForm({ userName: '', password: '' });
                 } catch (err) {
                   alert(String(err));
                 }
@@ -232,9 +228,11 @@ function Header() {
                   });
                   const data = await parseResponseSafe(res);
                   if (!res.ok) throw new Error(data.error || data.message || 'Registration failed');
-                  if (data.token) localStorage.setItem('authToken', data.token);
-                  setIsLoggedIn(true);
+                  if (data.token) {
+                    login(data.token, data.user);
+                  }
                   setIsSignUpCardOpen(false);
+                  setRegisterForm({ userName: '', email: '', contact: '', password: '' });
                 } catch (err) {
                   alert(String(err));
                 }
