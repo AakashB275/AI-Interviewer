@@ -4,7 +4,10 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
 dotenv.config();
-const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET || 'default_secret';
+const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET or JWT_KEY environment variable must be set');
+}
 
 export const registerUser = async function (req, res) {
     
@@ -15,6 +18,23 @@ export const registerUser = async function (req, res) {
             return res.status(400).json({ 
                 success: false,
                 error: "All fields are required" 
+            });
+        }
+
+        // Basic email validation
+        const emailRegex = /^\S+@\S+\.\S+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid email format"
+            });
+        }
+
+        // Basic password validation (minimum 6 characters)
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: "Password must be at least 6 characters long"
             });
         }
 

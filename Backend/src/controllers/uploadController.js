@@ -1,6 +1,9 @@
 import multer from 'multer';
-import express from 'express';
 import userModel from '../models/user.js';
+import { DocumentModel } from '../models/document.js';
+import { chunkModel } from '../models/chunks.js';
+import { extractTextFromFile } from '../services/documentParser.js';
+import { generateEmbedding } from '../services/embeddingService.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,6 +53,21 @@ export const upload = multer({
   },
   fileFilter: fileFilter
 });
+
+function chunkText(text, size = 800, overlap = 120) {
+  if (!text || !text.trim()) return [];
+  const words = text.split(/\s+/);
+  const chunks = [];
+  let start = 0;
+
+  while (start < words.length) {
+    const chunkWords = words.slice(start, start + size);
+    chunks.push(chunkWords.join(' ').trim());
+    start += size - overlap;
+  }
+
+  return chunks;
+}
 
 export const uploadUserData = async function(req, res) {
     try{
@@ -105,6 +123,59 @@ export const uploadUserData = async function(req, res) {
 
     await user.save();
 
+    const documentResults = [];
+    for (const file of uploadedFiles) {
+      const { text, mimeType } = await extractTextFromFile({
+        filePath: file.path,
+        mimeType: file.mimetype,
+        originalName: file.originalName
+      });
+
+      if (!text || !text.trim()) {
+        throw new Error(`No readable text extracted from ${file.originalName}`);
+      }
+
+      const document = await DocumentModel.create({
+        title: file.originalName,
+        content: text,
+        fileType: path.extname(file.originalName).replace('.', '').toLowerCase(),
+        mimeType: mimeType || file.mimetype,
+        originalFileName: file.originalName,
+        metadata: {
+          fileSize: file.size,
+          uploadedBy: userId
+        }
+      });
+
+      const textChunks = chunkText(text);
+      const chunkDocs = [];
+
+      for (let i = 0; i < textChunks.length; i++) {
+        const chunkTextValue = textChunks[i];
+        const embedding = await generateEmbedding(chunkTextValue);
+        chunkDocs.push({
+          documentId: document._id,
+          ownerId: userId,
+          chunkText: chunkTextValue,
+          embedding,
+          section: 'other',
+          embeddingModel: 'text-embedding-3-small',
+          embeddingDim: embedding.length,
+          position: i
+        });
+      }
+
+      if (chunkDocs.length) {
+        await chunkModel.insertMany(chunkDocs);
+      }
+
+      documentResults.push({
+        documentId: document._id,
+        chunkCount: chunkDocs.length,
+        title: document.title
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Files uploaded successfully",
@@ -113,7 +184,8 @@ export const uploadUserData = async function(req, res) {
         size: file.size,
         uploadDate: file.uploadDate
       })),
-      totalFiles: user.userTrainingData.uploadedFiles.length
+      totalFiles: user.userTrainingData.uploadedFiles.length,
+      documentsCreated: documentResults
     });
 
     }
@@ -154,14 +226,40 @@ export const getUserTrainingStatus = async function (req, res) {
     }
 
     const hasData = user.userTrainingData && user.userTrainingData.hasUploadedData;
-    const fileCount = 1;
+    const fileCount = hasData ? user.userTrainingData.uploadedFiles.length : 0;
+
+    // Get the most recent document for this user
+    let documentId = null;
+    if (hasData) {
+      const latestDocument = await DocumentModel.findOne({
+        'metadata.uploadedBy': req.user._id,
+        isActive: true
+      }).sort({ createdAt: -1 });
+      
+      if (latestDocument) {
+        documentId = latestDocument._id.toString();
+      }
+    }
+
+    // Get list of uploaded files with their details
+    const uploadedFiles = hasData && user.userTrainingData.uploadedFiles 
+      ? user.userTrainingData.uploadedFiles.map(file => ({
+          originalName: file.originalName,
+          filename: file.filename,
+          size: file.size,
+          mimetype: file.mimetype,
+          uploadDate: file.uploadDate
+        }))
+      : [];
 
     return res.status(200).json({
       success: true,
       hasUploadedData: hasData,
       fileCount: fileCount,
       lastUpdated: hasData ? user.userTrainingData.lastUpdated : null,
-      dataType: hasData ? user.userTrainingData.dataType : null
+      dataType: hasData ? user.userTrainingData.dataType : null,
+      documentId: documentId,
+      uploadedFiles: uploadedFiles
     });
 
   } catch (err) {
@@ -207,6 +305,23 @@ export const deleteUserFile = async function (req, res) {
 
     const fileToDelete = user.userTrainingData.uploadedFiles[fileIndex];
     
+    // Find and delete associated document and chunks
+    // Find document by original filename
+    const document = await DocumentModel.findOne({
+      'metadata.uploadedBy': userId,
+      originalFileName: fileToDelete.originalName,
+      isActive: true
+    });
+
+    if (document) {
+      // Delete all chunks associated with this document
+      await chunkModel.deleteMany({ documentId: document._id });
+      
+      // Mark document as inactive (soft delete) or delete it
+      document.isActive = false;
+      await document.save();
+    }
+    
     // Delete physical file
     if (fs.existsSync(fileToDelete.path)) {
       fs.unlinkSync(fileToDelete.path);
@@ -218,15 +333,31 @@ export const deleteUserFile = async function (req, res) {
     // Update hasUploadedData status
     if (user.userTrainingData.uploadedFiles.length === 0) {
       user.userTrainingData.hasUploadedData = false;
+      user.userTrainingData.lastUpdated = null;
+    } else {
+      user.userTrainingData.lastUpdated = new Date();
     }
     
-    user.userTrainingData.lastUpdated = new Date();
     await user.save();
+
+    // Get the new latest document ID after deletion
+    let newLatestDocumentId = null;
+    if (user.userTrainingData.uploadedFiles.length > 0) {
+      const latestDocument = await DocumentModel.findOne({
+        'metadata.uploadedBy': userId,
+        isActive: true
+      }).sort({ createdAt: -1 });
+      
+      if (latestDocument) {
+        newLatestDocumentId = latestDocument._id.toString();
+      }
+    }
 
     return res.status(200).json({
       success: true,
       message: "File deleted successfully",
-      remainingFiles: user.userTrainingData.uploadedFiles.length
+      remainingFiles: user.userTrainingData.uploadedFiles.length,
+      documentId: newLatestDocumentId
     });
 
   } catch (err) {

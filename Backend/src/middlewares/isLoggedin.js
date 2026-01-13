@@ -55,6 +55,6 @@ export default async function(req,res, next){
             });
         }
         req.flash("error", "something went wrong");
-        req.redirect("/");
+        return res.redirect("/");
     }
 };

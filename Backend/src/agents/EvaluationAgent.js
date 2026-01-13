@@ -1,36 +1,53 @@
 /**
  * EvaluationAgent
- * - Side-effect free evaluator that takes transcript and rubric and returns structured scores
- * - Constructor accepts { transcript, rubric }
+ * - Deterministic, heuristic evaluator
+ * - NOT a semantic judge of competence
+ * - Produces conservative signals, not verdicts
  */
 export class EvaluationAgent {
   constructor({ transcript = '', rubric = {} } = {}) {
-    this.transcript = String(transcript || '');
+    this.transcript = String(transcript || '').toLowerCase();
     this.rubric = rubric || {};
   }
 
-  async run() {
-    const t = this.transcript.toLowerCase();
-
-    // Deterministic scoring: simple keyword checks per rubric competencies
+  run() {
     const scores = {};
-    Object.keys(this.rubric).forEach(key => {
-      const keywords = Array.isArray(this.rubric[key].keywords) ? this.rubric[key].keywords : [];
-      let matched = 0;
-      keywords.forEach(k => { if (t.includes(k.toLowerCase())) matched++; });
-      const score = keywords.length ? Math.round((matched / keywords.length) * 5) : 0;
-      scores[key] = score;
-    });
 
-    // Overall: average of scores
-    const vals = Object.values(scores);
-    const overall = vals.length ? Math.round((vals.reduce((a,b)=>a+b,0) / vals.length) * 10) / 10 : 0;
+    for (const skill of Object.keys(this.rubric)) {
+      const { keywords = [], negativeKeywords = [] } = this.rubric[skill] || {};
+
+      let positiveHits = 0;
+      let negativeHits = 0;
+
+      keywords.forEach(k => {
+        if (this.transcript.includes(k.toLowerCase())) positiveHits++;
+      });
+
+      negativeKeywords.forEach(k => {
+        if (this.transcript.includes(k.toLowerCase())) negativeHits++;
+      });
+
+      // Conservative heuristic scoring
+      let score = 0;
+      if (positiveHits > 0) score = Math.min(5, positiveHits);
+      if (negativeHits > 0) score = Math.max(0, score - negativeHits);
+
+      scores[skill] = score;
+    }
+
+    const values = Object.values(scores);
+    const overall =
+      values.length > 0
+        ? Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1))
+        : 0;
 
     return {
-      type: 'Evaluation',
+      type: 'HeuristicEvaluation',
       scores,
       overallScore: overall,
-      notes: 'Deterministic agent output — designed for downstream human/LLM review.'
+      confidenceLevel: values.length ? 0.4 : 0.2,
+      notes:
+        'Keyword-based heuristic evaluation. Scores indicate signal presence, not proficiency.'
     };
   }
 }

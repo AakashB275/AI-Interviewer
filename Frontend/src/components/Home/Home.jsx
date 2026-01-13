@@ -16,6 +16,7 @@ import {
   Lock
 } from 'lucide-react';
 import TrainAIDialog from '../ui/trainDataDialogBox';
+import JobRoleDialog from '../ui/JobRoleDialog';
 import {
   Card,
   CardHeader,
@@ -121,7 +122,9 @@ function StatCard({ icon, label, value, colorClass }) {
 function Home() {
   const [showStats, setShowStats] = useState(false);
   const [isTrainAIDialogOpen, setIsTrainAIDialogOpen] = useState(false);
+  const [isJobRoleDialogOpen, setIsJobRoleDialogOpen] = useState(false);
   const [hasResume, setHasResume] = useState(false);
+  const [documentId, setDocumentId] = useState(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const { isLoggedIn, login } = useAuth();
   const navigate = useNavigate();
@@ -140,6 +143,7 @@ function Home() {
       if (response.ok) {
         const data = await response.json();
         setHasResume(data.hasUploadedData);
+        setDocumentId(data.documentId || null);
         localStorage.setItem('resumeUploaded', data.hasUploadedData);
       }
     } catch (error) {
@@ -169,7 +173,25 @@ function Home() {
       setIsTrainAIDialogOpen(true);
       return;
     }
-    navigate('/interview');
+    // Show job role dialog if resume is uploaded
+    setIsJobRoleDialogOpen(true);
+  };
+
+  const handleJobRoleConfirm = async (role) => {
+    if (!documentId) {
+      // If documentId is not available, try to fetch it again
+      await checkResumeStatus();
+      if (!documentId) {
+        alert('Unable to find your resume. Please upload it again.');
+        setIsJobRoleDialogOpen(false);
+        return;
+      }
+    }
+
+    // Navigate to interview page with role and documentId as URL params
+    // Difficulty will be determined automatically by the backend based on resume
+    navigate(`/interview?role=${encodeURIComponent(role)}&documentId=${documentId}`);
+    setIsJobRoleDialogOpen(false);
   };
 
   const handleTrainAI = () => {
@@ -355,6 +377,13 @@ function Home() {
       <TrainAIDialog 
         isOpen={isTrainAIDialogOpen} 
         onClose={handleTrainAIDialogClose}
+      />
+
+      {/* Job Role Dialog */}
+      <JobRoleDialog
+        isOpen={isJobRoleDialogOpen}
+        onClose={() => setIsJobRoleDialogOpen(false)}
+        onConfirm={handleJobRoleConfirm}
       />
 
       {/* Login Modal */}

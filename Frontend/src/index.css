@@ -83,7 +83,7 @@ h1 {
   font-weight: 500;
   font-family: inherit;
   /* background-color: #3B82F6; */
-  color: white;
+  /* color: white; */
   cursor: pointer;
   transition: all 0.25s;
 }

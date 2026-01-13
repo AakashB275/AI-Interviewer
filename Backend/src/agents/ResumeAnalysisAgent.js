@@ -15,7 +15,7 @@ export class ResumeAnalysisAgent {
 
     // Deterministic, simple heuristics (no LLM)
     const skills = [];
-    const knownSkills = ['javascript','node','react','python','java','sql','mongodb','docker','aws','git'];
+    const knownSkills = ['javascript','js','node','react','python','java','sql','mongodb','docker','aws','git'];
     knownSkills.forEach(s => { if (t.includes(s)) skills.push(s); });
 
     // Estimate years of experience from patterns like 'x years'

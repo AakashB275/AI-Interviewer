@@ -12,10 +12,10 @@ const documentSchema = new mongoose.Schema({
     required: [true, 'Document content is required']
   },
   fileType: {
-  type: String,
-  enum: ["pdf", "doc", "docx"],
-},
-mimeType: String,
+    type: String,
+    enum: ["pdf", "doc", "docx", "txt", "json"],
+  },
+  mimeType: String,
 
   originalFileName: {
     type: String,

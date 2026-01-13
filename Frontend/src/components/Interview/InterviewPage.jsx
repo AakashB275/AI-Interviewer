@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +7,8 @@ import maleInterviewerImage from '../../assets/male_interviewer.png';
 
 const InterviewPage = () => {
   const { user, setUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [username, setUsername] = useState(user?.userName || 'User');
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
@@ -17,10 +20,30 @@ const InterviewPage = () => {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [jobRole, setJobRole] = useState('');
+  const [difficulty, setDifficulty] = useState('medium');
+  const [documentId, setDocumentId] = useState(null);
   
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const silenceTimerRef = useRef(null);
+
+  // Get URL parameters
+  useEffect(() => {
+    const role = searchParams.get('role');
+    const docId = searchParams.get('documentId');
+
+    if (!role || !docId) {
+      alert('Missing required information. Please start the interview from the home page.');
+      navigate('/home');
+      return;
+    }
+
+    setJobRole(role);
+    setDocumentId(docId);
+    // Difficulty will be determined automatically by the backend
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     initializeMedia();
@@ -76,21 +99,73 @@ const InterviewPage = () => {
   };
 
   const handleStartInterview = async () => {
-    setIsInterviewActive(true);
-    
-    // Initialize speech recognition
-    const initialized = SpeechService.initRecognition(
-      handleSpeechResult,
-      handleSpeechError
-    );
-
-    if (!initialized) {
-      alert('Speech recognition not supported in this browser');
+    if (!documentId || !jobRole) {
+      alert('Missing required information. Please start the interview from the home page.');
+      navigate('/home');
       return;
     }
 
-    // Get first question from AI
-    await getNextQuestion();
+    setIsProcessing(true);
+    
+    try {
+      // Start interview session with backend
+      const response = await fetch('/api/interview/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          documentId,
+          role: jobRole
+          // difficulty will be determined automatically by the backend based on resume embeddings
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        alert(data.error || 'Failed to start interview');
+        setIsProcessing(false);
+        return;
+      }
+
+      setSessionId(data.sessionId);
+      setCurrentQuestion(data.question);
+      
+      // Add to conversation history
+      setConversationHistory([{
+        role: 'interviewer',
+        content: data.question,
+        timestamp: new Date()
+      }]);
+
+      // Initialize speech recognition
+      const initialized = SpeechService.initRecognition(
+        handleSpeechResult,
+        handleSpeechError
+      );
+
+      if (!initialized) {
+        alert('Speech recognition not supported in this browser');
+        setIsProcessing(false);
+        return;
+      }
+
+      setIsInterviewActive(true);
+      
+      // Speak the question
+      setIsAISpeaking(true);
+      await SpeechService.speak(data.question);
+      setIsAISpeaking(false);
+
+      // Start listening for answer
+      setIsListening(true);
+      SpeechService.startListening();
+    } catch (error) {
+      console.error('Error starting interview:', error);
+      alert('Failed to start interview. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSpeechResult = ({ final, interim }) => {
@@ -121,15 +196,55 @@ const InterviewPage = () => {
   };
 
   const getNextQuestion = async () => {
+    if (!sessionId) {
+      console.error('No session ID available');
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
-      const response = await fetch('/api/interview/next-question', {
+      // This will be called after submitting an answer
+      // The backend will return the next question
+      // For now, we'll handle this in handleAnswerComplete
+    } catch (error) {
+      console.error('Error getting question:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAnswerComplete = async (answer) => {
+    if (!sessionId) {
+      console.error('No session ID available');
+      return;
+    }
+
+    // Stop listening while processing
+    SpeechService.stopListening();
+    setIsListening(false);
+    setIsProcessing(true);
+    
+    // Add answer to history
+    setConversationHistory(prev => [...prev, {
+      role: 'candidate',
+      content: answer,
+      timestamp: new Date()
+    }]);
+
+    // Clear transcripts
+    setUserTranscript('');
+    setInterimTranscript('');
+
+    try {
+      // Submit answer and get next question
+      const response = await fetch('/api/interview/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          conversationHistory,
+          sessionId,
+          answer
         })
       });
 
@@ -154,32 +269,15 @@ const InterviewPage = () => {
         // Start listening for answer
         setIsListening(true);
         SpeechService.startListening();
+      } else {
+        alert(data.error || 'Failed to get next question');
       }
     } catch (error) {
-      console.error('Error getting question:', error);
+      console.error('Error submitting answer:', error);
+      alert('Failed to submit answer. Please try again.');
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleAnswerComplete = async (answer) => {
-    // Stop listening while processing
-    SpeechService.stopListening();
-    setIsListening(false);
-    
-    // Add answer to history
-    setConversationHistory(prev => [...prev, {
-      role: 'candidate',
-      content: answer,
-      timestamp: new Date()
-    }]);
-
-    // Clear transcripts
-    setUserTranscript('');
-    setInterimTranscript('');
-
-    // Get next question
-    await getNextQuestion();
   };
 
   const handleStopInterview = async () => {
@@ -188,6 +286,20 @@ const InterviewPage = () => {
     setIsInterviewActive(false);
     setIsListening(false);
     
+    // End interview session
+    if (sessionId) {
+      try {
+        await fetch('/api/interview/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ sessionId })
+        });
+      } catch (error) {
+        console.error('Error ending interview:', error);
+      }
+    }
+
     // Generate interview report
     if (conversationHistory.length > 0) {
       await generateReport();
@@ -360,15 +472,25 @@ const InterviewPage = () => {
             </div>
           )}
 
+          {/* Job Role Info */}
+          {jobRole && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-600 font-medium">
+                Interviewing for: <span className="text-blue-800">{jobRole}</span>
+              </p>
+            </div>
+          )}
+
           {/* Controls */}
           <div className="flex items-center justify-center space-x-4 pt-4 border-t border-gray-200">
             {!isInterviewActive ? (
               <button
                 onClick={handleStartInterview}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition shadow-md"
+                disabled={isProcessing || !documentId || !jobRole}
+                className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Mic className="w-5 h-5" />
-                <span>Start Interview</span>
+                <span>{isProcessing ? 'Starting...' : 'Start Interview'}</span>
               </button>
             ) : (
               <>

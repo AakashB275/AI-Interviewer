@@ -1,116 +1,250 @@
-import sessionService from '../services/sessionService.js';
-import questionBankService from '../services/questionBankService.js';
-import messageService from '../services/interviewMessageService.js';
-import ResumeAnalysisAgent from '../agents/ResumeAnalysisAgent.js';
-import InterviewPlannerAgent from '../agents/InterviewPlannerAgent.js';
+import InterviewSession from '../models/interviewSession.js';
+import { DocumentModel } from '../models/document.js';
+import vectorSearchService from '../services/vectorSearchService.js';
+import llmService from '../services/llmService.js';
+import { ResumeAnalysisAgent } from '../agents/ResumeAnalysisAgent.js';
+import { InterviewPlannerAgent } from '../agents/InterviewPlannerAgent.js';
 
 /**
- * Start interview: create session, produce plan via agent, select questions via service, persist session metadata
+ * START INTERVIEW
+ * Creates a session and returns the first question
+ * Difficulty is automatically determined based on resume analysis
  */
 export async function startInterview(req, res) {
-	try {
-		const userId = req.user && req.user._id;
-		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
 
-		const { resumeText, constraints = {} } = req.body || {};
+    const { documentId, role } = req.body;
 
-		// Create session record
-		const session = await sessionService.createSession({ userId, metadata: { source: 'api' } });
+    if (!documentId || !role) {
+      return res.status(400).json({ success: false, error: 'documentId and role are required' });
+    }
 
-		// Analyze resume via agent (agent is side-effect free)
-		const resumeAgent = new ResumeAnalysisAgent({ text: resumeText || '', metadata: { userId } });
-		const resumeAnalysis = await resumeAgent.run();
+    // Get document content for resume analysis
+    const document = await DocumentModel.findById(documentId);
+    if (!document) {
+      return res.status(404).json({ success: false, error: 'Document not found' });
+    }
 
-		// Plan interview via agent
-		const planner = new InterviewPlannerAgent({ resumeAnalysis, constraints });
-		const plan = await planner.run();
+    // Analyze resume to determine experience level
+    const resumeAnalysisAgent = new ResumeAnalysisAgent({
+      text: document.content,
+      metadata: document.metadata
+    });
+    const resumeAnalysis = await resumeAnalysisAgent.run();
 
-		// Select concrete questions via question bank service
-		const skills = resumeAnalysis.skills || [];
-		const questions = await questionBankService.selectQuestions({ skills, count: plan.questionCount, difficulty: undefined });
+    // Determine difficulty based on years of experience
+    // This matches the logic in InterviewPlannerAgent:
+    // years >= 5 ? 'hard' : years >= 2 ? 'medium' : 'easy'
+    const years = Number(resumeAnalysis.estimatedYearsExperience || 0);
+    const difficulty = years >= 5 ? 'hard' : years >= 2 ? 'medium' : 'easy';
 
-		// Persist plan into session metadata
-		const updated = await sessionService.updateSession(session._id, { metadata: { plan, questionIds: questions.map(q=>q._id), currentIndex: 0 } });
+    // Create session with auto-determined difficulty
+    const session = await InterviewSession.create({
+      user: userId,
+      documentId,
+      role,
+      difficulty,
+      status: 'active',
+      startedAt: new Date()
+    });
 
-		return res.json({ success: true, session: updated, questions });
-	} catch (err) {
-		console.error('startInterview error', err);
-		return res.status(500).json({ success: false, error: err.message });
-	}
+    // Retrieve resume chunks (projects first)
+    const chunks = await vectorSearchService.search({
+      documentId,
+      query: 'most complex project and backend experience',
+      limit: 4
+    });
+
+    // Generate first question
+    const question = await llmService.generateQuestion({
+      role,
+      difficulty,
+      resumeChunks: chunks.map(chunk => ({ chunkText: chunk.chunkText || chunk.text || '' }))
+    });
+
+    session.currentQuestion = {
+      text: question.text,
+      competency: question.competency,
+      difficulty,
+      askedAt: new Date()
+    };
+
+    await session.save();
+
+    return res.json({
+      success: true,
+      sessionId: session._id,
+      question: question.text,
+      difficulty // Return the determined difficulty
+    });
+  } catch (err) {
+    console.error('startInterview error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to start interview' });
+  }
 }
 
-export async function getUserSessions(req, res) {
-	try {
-		const userId = req.user && req.user._id;
-		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
-
-		const sessions = await sessionService.getSessionByUser?.(userId) || [];
-		return res.json({ success: true, sessions });
-	} catch (err) {
-		console.error('getUserSessions error', err);
-		return res.status(500).json({ success: false, error: err.message });
-	}
-}
-
-export async function nextQuestion(req, res) {
-	try {
-		const userId = req.user && req.user._id;
-		const { sessionId } = req.body || {};
-		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
-		if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
-
-		const session = await sessionService.getSession(sessionId);
-		if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
-
-		const meta = session.metadata || {};
-		const current = Number(meta.currentIndex || 0);
-		const questionIds = meta.questionIds || [];
-		if (current >= questionIds.length) return res.status(200).json({ success: true, message: 'No more questions' });
-
-		const qId = questionIds[current];
-		const questions = await questionBankService.getQuestions({ _id: qId });
-		const question = questions && questions[0];
-
-		// advance index
-		await sessionService.updateSession(sessionId, { metadata: { ...meta, currentIndex: current + 1 } });
-
-		return res.json({ success: true, question });
-	} catch (err) {
-		console.error('nextQuestion error', err);
-		return res.status(500).json({ success: false, error: err.message });
-	}
-}
-
+/**
+ * SUBMIT ANSWER
+ * Evaluates answer and returns next question or feedback
+ */
 export async function submitAnswer(req, res) {
-	try {
-		const userId = req.user && req.user._id;
-		const { sessionId, questionId, answer } = req.body || {};
-		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
-		if (!sessionId || !questionId || !answer) return res.status(400).json({ success: false, error: 'sessionId, questionId and answer are required' });
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
 
-		// Persist candidate answer as message
-		const saved = await messageService.saveMessage({ sessionId, role: 'candidate', message: JSON.stringify({ questionId, answer }) });
+    const { sessionId, answer } = req.body;
+    if (!sessionId || !answer) {
+      return res.status(400).json({ success: false, error: 'sessionId and answer are required' });
+    }
 
-		return res.json({ success: true, saved });
-	} catch (err) {
-		console.error('submitAnswer error', err);
-		return res.status(500).json({ success: false, error: err.message });
-	}
+    const session = await InterviewSession.findById(sessionId);
+    if (!session || session.status !== 'active') {
+      return res.status(404).json({ success: false, error: 'Active session not found' });
+    }
+
+    const currentQuestion = session.currentQuestion;
+    if (!currentQuestion) {
+      return res.status(400).json({ success: false, error: 'No active question in session' });
+    }
+
+    // Evaluate answer
+    const evaluation = await llmService.evaluateAnswer({
+      question: currentQuestion.text,
+      answer,
+      competency: currentQuestion.competency,
+      difficulty: currentQuestion.difficulty
+    });
+
+    // Save history
+    session.questionHistory.push({
+      text: currentQuestion.text,
+      competency: currentQuestion.competency,
+      difficulty: currentQuestion.difficulty,
+      evaluation: {
+        depth: evaluation.depth,
+        coverage: evaluation.coverage,
+        strengths: evaluation.strengths || [],
+        gaps: evaluation.gaps || [],
+        summary: evaluation.summary || '',
+        followUpRecommended: evaluation.followUpRecommended || false
+      }
+    });
+
+    // Update progress
+    session.progress = session.progress || {};
+    if (evaluation.gaps?.length) {
+      session.progress.weaknesses = [
+        ...(session.progress.weaknesses || []),
+        currentQuestion.competency
+      ];
+    } else {
+      session.progress.strengths = [
+        ...(session.progress.strengths || []),
+        currentQuestion.competency
+      ];
+    }
+
+    // Decide next step
+    let nextQuestionText = null;
+    let nextQuestion = null;
+
+    if (evaluation.followUpRecommended && evaluation.gaps?.length > 0) {
+      const followUpText = await llmService.generateFollowUp({
+        previousQuestion: currentQuestion.text,
+        gaps: evaluation.gaps
+      });
+      nextQuestionText = followUpText;
+      session.currentQuestion = {
+        text: followUpText,
+        competency: currentQuestion.competency, // Keep same competency for follow-up
+        difficulty: currentQuestion.difficulty,
+        askedAt: new Date()
+      };
+    } else {
+      const chunks = await vectorSearchService.search({
+        documentId: session.documentId,
+        query: 'next important skill or project',
+        limit: 3
+      });
+
+      nextQuestion = await llmService.generateQuestion({
+        role: session.role,
+        difficulty: session.difficulty,
+        resumeChunks: chunks.map(chunk => ({ chunkText: chunk.chunkText || chunk.text || '' }))
+      });
+
+      nextQuestionText = nextQuestion.text;
+      session.currentQuestion = {
+        text: nextQuestion.text,
+        competency: nextQuestion.competency,
+        difficulty: session.difficulty,
+        askedAt: new Date()
+      };
+    }
+
+    await session.save();
+
+    return res.json({
+      success: true,
+      feedback: evaluation.summary,
+      question: nextQuestionText
+    });
+  } catch (err) {
+    console.error('submitAnswer error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to process answer' });
+  }
 }
 
+/**
+ * END INTERVIEW
+ */
 export async function endInterview(req, res) {
-	try {
-		const userId = req.user && req.user._id;
-		const { sessionId } = req.body || {};
-		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
-		if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+  try {
+    const userId = req.user?._id;
+    const { sessionId } = req.body;
 
-		const ended = await sessionService.endSession(sessionId);
-		return res.json({ success: true, session: ended });
-	} catch (err) {
-		console.error('endInterview error', err);
-		return res.status(500).json({ success: false, error: err.message });
-	}
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const session = await InterviewSession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    session.status = 'ended';
+    session.endedAt = new Date();
+    await session.save();
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('endInterview error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to end interview' });
+  }
 }
 
-export default { startInterview, nextQuestion, submitAnswer, endInterview, getUserSessions };
+/**
+ * GET USER SESSIONS
+ */
+export async function getUserSessions(req, res) {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const sessions = await InterviewSession.find({ user: userId })
+      .sort({ createdAt: -1 });
+
+    return res.json({ success: true, sessions });
+  } catch (err) {
+    console.error('getUserSessions error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch sessions' });
+  }
+}

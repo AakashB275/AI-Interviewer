@@ -1,10 +1,29 @@
 import mongoose from 'mongoose';
 
 const userSchema = mongoose.Schema({
-    userName : String,
-    email: String,
-    password : String,
-    contact : Number,
+    userName : {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true,
+        trim: true,
+        match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
+    },
+    password : {
+        type: String,
+        required: true,
+        minlength: 6
+    },
+    contact : {
+        type: String, // Changed to String for international support
+        required: true
+    },
     userTrainingData: {
         hasUploadedData: {
             type: Boolean,
