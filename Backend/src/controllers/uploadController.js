@@ -46,12 +46,12 @@ const fileFilter = (req, file, cb) => {
 export const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 1 * 1024 * 1024, // 1MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: fileFilter
 });
 
-export const uploadUserData = async function(req, res, cb) {
+export const uploadUserData = async function(req, res) {
     try{
         if (!req.user) {
       return res.status(401).json({

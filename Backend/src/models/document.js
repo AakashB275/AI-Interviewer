@@ -1,17 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- Document schema for storing uploaded documents and embeddings.
- @typedef {Object} IDocument
- @property {string} title
- @property {string} content
- @property {number[]} embedding
- @property {'pdf'|'doc'|'docx'|'txt'|'image'} filetype
- @property {string} originalFileName
- @property {{fileSize:number, uploadedBy:mongoose.Types.ObjectId, tags:string[], category:string, language:string}} metadata
- @property {boolean} isActive
- */
-
 const documentSchema = new mongoose.Schema({
   title: {
     type: String,

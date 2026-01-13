@@ -5,14 +5,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { connectDB } from './src/loaders/db.js';
-import multer from 'multer';
 import apiRouter from './src/routes/api.js';
 import rateLimit from 'express-rate-limit';
 import requestLogger from './src/middlewares/requestLogger.js';
-
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -23,10 +18,16 @@ app.use(cors({
   credentials: true
 }));
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 async function bootstrap(){
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Static file serving
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const limiter = rateLimit({
@@ -38,60 +39,32 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use(requestLogger);
 
-
-// console.log(`Upload directory: ${path.join(__dirname, 'uploads/user-data')}`);
 console.log('✅ Rate limiting configured');
-
-app.use("/api", apiRouter);
-
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Set view engine
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "src", "views"));
 
 await connectDB();
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error("Global error handler:", error);
-  
-  // Handle multer errors
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        success: false,
-        error: 'File size too large. Maximum size is 10MB per file.'
-      });
-    }
-    if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({
-        success: false,
-        error: 'Too many files. Maximum 5 files allowed per upload.'
-      });
-    }
-  }
-  
-  // Handle other file upload errors
-  if (error.message.includes('Invalid file type')) {
-    return res.status(400).json({
-      success: false,
-      error: error.message
-    });
-  }
-  
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error'
-  });
-});
+app.use("/api", apiRouter);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
+  res.status(404).json({ 
+    success: false, 
+    message: 'Route not found',
+    path: req.originalUrl 
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+  
+  res.status(status).json({
     success: false,
-    error: 'Route not found'
+    message: message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 

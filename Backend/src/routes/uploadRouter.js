@@ -8,7 +8,7 @@ const router = express.Router();
 router.get("/status", isLoggedIn, getUserTrainingStatus);
 
 // Upload user training data
-router.post("/train-data", isLoggedIn, uploadUserData);
+router.post("/train-data", isLoggedIn, upload.array('trainingFiles'), uploadUserData);
 
 // Delete specific file
 router.delete("/file/:filename", isLoggedIn, deleteUserFile);

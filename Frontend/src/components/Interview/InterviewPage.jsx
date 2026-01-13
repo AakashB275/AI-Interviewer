@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
+import { useAuth } from '../../context/AuthContext';
+import maleInterviewerImage from '../../assets/male_interviewer.png';
 
 const InterviewPage = () => {
+  const { user, setUser } = useAuth();
+  const [username, setUsername] = useState(user?.userName || 'User');
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [userTranscript, setUserTranscript] = useState('');
@@ -22,6 +26,31 @@ const InterviewPage = () => {
     initializeMedia();
     return cleanup;
   }, []);
+
+  // Fetch user data if not available
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) {
+        try {
+          const response = await fetch('/api/auth/me', {
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.user) {
+              setUser(data.user);
+              setUsername(data.user.userName || 'User');
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        setUsername(user.userName || 'User');
+      }
+    };
+    fetchUserData();
+  }, [user, setUser]);
 
   const initializeMedia = async () => {
     try {
@@ -246,15 +275,23 @@ const InterviewPage = () => {
 
           {/* Video Feed */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* AI Interviewer */}
             <div className="relative bg-white rounded-xl overflow-hidden aspect-video border border-gray-200 shadow-sm">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
                 <div className="text-center">
-                  <Video className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">AI Interviewer</p>
+                  <img 
+                    src={maleInterviewerImage} 
+                    alt="AI Interviewer" 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-center py-2">
+                <p className="font-medium">AI Interviewer</p>
+              </div>
             </div>
-
+            
+            {/* User Camera Feed */}
             <div className="relative bg-white rounded-xl overflow-hidden aspect-video border border-gray-200 shadow-sm">
               {videoEnabled ? (
                 <video
@@ -270,6 +307,9 @@ const InterviewPage = () => {
                   <VideoOff className="w-16 h-16 text-gray-400" />
                 </div>
               )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-center py-2">
+                <p className="font-medium">{username}</p>
+              </div>
             </div>
           </div>
 
