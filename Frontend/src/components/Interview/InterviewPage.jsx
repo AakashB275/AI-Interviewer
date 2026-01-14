@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
 import { useAuth } from '../../context/AuthContext';
-import maleInterviewerImage from '../../assets/male_interviewer.png';
+import femaleInterviewerImage from '../../assets/female_interviewer.png';
 
 const InterviewPage = () => {
   const { user, setUser } = useAuth();
@@ -212,19 +212,30 @@ const InterviewPage = () => {
     }
   }, []);
 
+  const handleInterrupt = useCallback((transcript) => {
+    console.log('🛑 Interview interrupted by user:', transcript);
+    // Stop the 2-second silence timer to avoid double submission
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    setIsAISpeaking(false);
+  }, []);
+
   // Re-initialize speech recognition when sessionId or callbacks change
   useEffect(() => {
     if (isInterviewActive && sessionId) {
       console.log('Re-initializing speech recognition with updated callbacks');
       const initialized = SpeechService.initRecognition(
         handleSpeechResult,
-        handleSpeechError
+        handleSpeechError,
+        handleInterrupt
       );
       if (!initialized) {
         console.warn('Failed to initialize speech recognition');
       }
     }
-  }, [isInterviewActive, sessionId, handleSpeechResult, handleSpeechError]);
+  }, [isInterviewActive, sessionId, handleSpeechResult, handleSpeechError, handleInterrupt]);
 
   const getNextQuestion = async () => {
     if (!sessionId) {
@@ -489,7 +500,7 @@ ${evaluation.notes || 'No additional feedback'}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
                 <div className="text-center">
                   <img 
-                    src={maleInterviewerImage} 
+                    src={femaleInterviewerImage} 
                     alt="AI Interviewer" 
                     className="w-full h-full object-cover"
                   />

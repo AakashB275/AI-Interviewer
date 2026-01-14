@@ -31,6 +31,14 @@ const interviewSessionSchema = new mongoose.Schema({
     askedAt: Date
   },
 
+  // Track conversation depth on current topic
+  conversationDepth: {
+    currentTopicIndex: { type: Number, default: 0 },
+    answerCount: { type: Number, default: 0 },
+    lastAnswerLength: { type: Number, default: 0 },
+    shouldMoveToNextTopic: { type: Boolean, default: false }
+  },
+
   questionHistory: [{
     text: String,
     competency: String,
