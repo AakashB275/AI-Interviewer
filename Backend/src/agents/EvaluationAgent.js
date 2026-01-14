@@ -45,9 +45,10 @@ export class EvaluationAgent {
       type: 'HeuristicEvaluation',
       scores,
       overallScore: overall,
-      confidenceLevel: values.length ? 0.4 : 0.2,
+      // Conservative, bounded confidence to prevent misuse as "ground truth"
+      confidenceLevel: values.length ? 0.35 : 0.3,
       notes:
-        'Keyword-based heuristic evaluation. Scores indicate signal presence, not proficiency.'
+        'Heuristic keyword-based signal, not semantic competence score. Scores indicate keyword-signal presence, not proficiency.'
     };
   }
 }

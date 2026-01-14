@@ -1,10 +1,21 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { createRequire } from 'module';
 import mammoth from 'mammoth';
+import { createRequire } from 'module';
 
+// Use createRequire to interop with CommonJS / hybrid builds of pdf-parse
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const pdfParseModule = require('pdf-parse');
+
+// Normalise possible shapes: function export, default export, or named export
+const pdfParse =
+  typeof pdfParseModule === 'function'
+    ? pdfParseModule
+    : typeof pdfParseModule?.default === 'function'
+    ? pdfParseModule.default
+    : typeof pdfParseModule?.pdfParse === 'function'
+    ? pdfParseModule.pdfParse
+    : null;
 
 /**
  * Pure extraction service: extracts raw text from supported files.
@@ -20,6 +31,9 @@ export async function extractTextFromFile({ filePath, mimeType, originalName } =
 	const ext = path.extname(filePath).toLowerCase();
 	try {
 		if (ext === '.pdf' || (mimeType && mimeType.includes('pdf'))) {
+			if (!pdfParse) {
+				throw new Error('pdfParse module could not be initialised');
+			}
 			const dataBuffer = await fs.readFile(filePath);
 			const parsed = await pdfParse(dataBuffer);
 			const text = parsed?.text || '';

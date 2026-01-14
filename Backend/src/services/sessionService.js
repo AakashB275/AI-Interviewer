@@ -7,7 +7,24 @@ import InterviewSession from '../models/interviewSession.js';
  */
 export async function createSession({ userId, metadata = {} } = {}) {
 	if (!userId) throw new Error('userId is required');
-	const session = await InterviewSession.create({ user: userId, metadata, status: 'active', startedAt: new Date() });
+	// This app's session model requires documentId/role/difficulty/interviewPlan.
+	// Keep this helper explicit to avoid creating invalid sessions.
+	const { documentId, role, difficulty, interviewPlan } = metadata || {};
+	if (!documentId) throw new Error('documentId is required');
+	if (!role) throw new Error('role is required');
+	if (!difficulty) throw new Error('difficulty is required');
+	if (!interviewPlan) throw new Error('interviewPlan is required');
+
+	const session = await InterviewSession.create({
+		user: userId,
+		documentId,
+		role,
+		difficulty,
+		interviewPlan,
+		currentQuestionIndex: 0,
+		status: 'active',
+		startedAt: new Date()
+	});
 	return session.toObject();
 }
 

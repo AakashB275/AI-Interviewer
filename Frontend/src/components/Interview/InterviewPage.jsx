@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
@@ -28,6 +28,14 @@ const InterviewPage = () => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const silenceTimerRef = useRef(null);
+
+  // Log sessionId changes
+  useEffect(() => {
+    console.log('📊 sessionId changed:', sessionId);
+  }, [sessionId]);
+
+  // Small helper to create deliberate pauses (e.g., AI responds 2s after user stops)
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Get URL parameters
   useEffect(() => {
@@ -120,7 +128,13 @@ const InterviewPage = () => {
         })
       });
 
+      console.log('Start interview response status:', response.status, response.ok);
+
       const data = await response.json();
+      
+      console.log('Full response data:', data);
+      console.log('sessionId from response:', data.sessionId);
+      console.log('sessionId type:', typeof data.sessionId);
       
       if (!data.success) {
         alert(data.error || 'Failed to start interview');
@@ -128,7 +142,17 @@ const InterviewPage = () => {
         return;
       }
 
+      if (!data.sessionId) {
+        console.error('CRITICAL: sessionId is missing from response!', { data });
+        alert('Failed to start interview: Missing session ID in response');
+        setIsProcessing(false);
+        return;
+      }
+
+      console.log('Setting sessionId to:', data.sessionId);
       setSessionId(data.sessionId);
+      console.log('After setSessionId call - sessionId should be queued for update');
+      
       setCurrentQuestion(data.question);
       
       // Add to conversation history
@@ -138,18 +162,7 @@ const InterviewPage = () => {
         timestamp: new Date()
       }]);
 
-      // Initialize speech recognition
-      const initialized = SpeechService.initRecognition(
-        handleSpeechResult,
-        handleSpeechError
-      );
-
-      if (!initialized) {
-        alert('Speech recognition not supported in this browser');
-        setIsProcessing(false);
-        return;
-      }
-
+      // Set interview as active - this will trigger the useEffect to initialize speech recognition
       setIsInterviewActive(true);
       
       // Speak the question
@@ -157,9 +170,11 @@ const InterviewPage = () => {
       await SpeechService.speak(data.question);
       setIsAISpeaking(false);
 
-      // Start listening for answer
-      setIsListening(true);
-      SpeechService.startListening();
+      // Start listening for answer (only if mic enabled)
+      if (audioEnabled) {
+        setIsListening(true);
+        SpeechService.startListening();
+      }
     } catch (error) {
       console.error('Error starting interview:', error);
       alert('Failed to start interview. Please try again.');
@@ -168,7 +183,8 @@ const InterviewPage = () => {
     }
   };
 
-  const handleSpeechResult = ({ final, interim }) => {
+  const handleSpeechResult = useCallback(({ final, interim }) => {
+    console.log('handleSpeechResult called:', { final, interim, currentSessionId: sessionId });
     setInterimTranscript(interim);
     
     if (final.trim()) {
@@ -181,19 +197,34 @@ const InterviewPage = () => {
 
       // Detect end of answer (2 seconds of silence)
       silenceTimerRef.current = setTimeout(() => {
+        console.log('Silence timeout triggered - calling handleAnswerComplete with:', final.trim());
         if (final.trim()) {
           handleAnswerComplete(final.trim());
         }
       }, 2000);
     }
-  };
+  }, [sessionId]);
 
-  const handleSpeechError = (error) => {
+  const handleSpeechError = useCallback((error) => {
     console.error('Speech error:', error);
     if (error === 'no-speech') {
       // User stopped speaking, might want to prompt
     }
-  };
+  }, []);
+
+  // Re-initialize speech recognition when sessionId or callbacks change
+  useEffect(() => {
+    if (isInterviewActive && sessionId) {
+      console.log('Re-initializing speech recognition with updated callbacks');
+      const initialized = SpeechService.initRecognition(
+        handleSpeechResult,
+        handleSpeechError
+      );
+      if (!initialized) {
+        console.warn('Failed to initialize speech recognition');
+      }
+    }
+  }, [isInterviewActive, sessionId, handleSpeechResult, handleSpeechError]);
 
   const getNextQuestion = async () => {
     if (!sessionId) {
@@ -215,8 +246,14 @@ const InterviewPage = () => {
   };
 
   const handleAnswerComplete = async (answer) => {
+    console.log('=== handleAnswerComplete called ===');
+    console.log('Current sessionId value:', sessionId);
+    console.log('sessionId type:', typeof sessionId);
+    console.log('Answer received:', answer);
+    
     if (!sessionId) {
-      console.error('No session ID available');
+      console.error('CRITICAL: No session ID available', { sessionId });
+      alert('Error: No session ID available. Please start the interview again.');
       return;
     }
 
@@ -248,10 +285,52 @@ const InterviewPage = () => {
         })
       });
 
-      const data = await response.json();
+      console.log('Answer submission response status:', response.status, response.ok);
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: 'Could not parse error response' };
+        }
+        console.error('Server error response:', response.status, errorData);
+        const errorMsg = errorData?.error || `Server error: ${response.status}`;
+        alert(`Error: ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('Failed to parse response JSON:', e);
+        alert('Error: Failed to parse server response');
+        return;
+      }
+
+      console.log('Answer submission response:', data);
       
       if (data.success) {
+        // Check if interview is complete
+        if (data.interviewComplete) {
+          // Interview is complete, end it
+          alert('Interview completed! Ending session...');
+          await handleStopInterview();
+          return;
+        }
+
         const question = data.question;
+        
+        // Validate that we have a question
+        if (!question) {
+          console.error('No question received from server:', data);
+          alert('Error: No question received from server');
+          return;
+        }
+
+        console.log('Received new question:', question);
+
         setCurrentQuestion(question);
         
         // Add to conversation history
@@ -261,20 +340,25 @@ const InterviewPage = () => {
           timestamp: new Date()
         }]);
 
-        // Speak the question
+        // Speak the question after a brief pause to feel more natural
         setIsAISpeaking(true);
+        await delay(2000);
         await SpeechService.speak(question);
         setIsAISpeaking(false);
 
-        // Start listening for answer
-        setIsListening(true);
-        SpeechService.startListening();
+        // Start listening for answer (only if mic enabled)
+        if (audioEnabled) {
+          setIsListening(true);
+          SpeechService.startListening();
+        }
       } else {
-        alert(data.error || 'Failed to get next question');
+        const errorMsg = data.error || 'Failed to get next question';
+        console.error('API returned success: false', data);
+        alert(`Error: ${errorMsg}`);
       }
     } catch (error) {
       console.error('Error submitting answer:', error);
-      alert('Failed to submit answer. Please try again.');
+      alert('Failed to submit answer. Please check the console for details.');
     } finally {
       setIsProcessing(false);
     }
@@ -286,50 +370,50 @@ const InterviewPage = () => {
     setIsInterviewActive(false);
     setIsListening(false);
     
-    // End interview session
+    // End interview session - this also evaluates the interview
+    let evaluation = null;
     if (sessionId) {
       try {
-        await fetch('/api/interview/end', {
+        const response = await fetch('/api/interview/end', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ sessionId })
         });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.evaluation) {
+            evaluation = data.evaluation;
+            console.log('Interview evaluation:', evaluation);
+          }
+        }
       } catch (error) {
         console.error('Error ending interview:', error);
       }
-    }
-
-    // Generate interview report
-    if (conversationHistory.length > 0) {
-      await generateReport();
     }
 
     // Stop media
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
-  };
 
-  const generateReport = async () => {
-    try {
-      const response = await fetch('/api/interview/generate-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          conversationHistory
-        })
-      });
+    // Show evaluation summary or navigate to results page
+    if (evaluation) {
+      const summary = `
+Interview Complete!
 
-      const data = await response.json();
+Overall Score: ${evaluation.overallScore || 'N/A'}/5.0
+Confidence Level: ${evaluation.confidenceLevel || 'N/A'}
+
+Feedback:
+${evaluation.notes || 'No additional feedback'}
+      `.trim();
       
-      if (data.success) {
-        // Navigate to report page or show modal
-        console.log('Report generated:', data.report);
-      }
-    } catch (error) {
-      console.error('Error generating report:', error);
+      alert(summary);
+      
+      // Optionally navigate to a results page
+      // navigate('/interview-results', { state: { evaluation } });
     }
   };
 
@@ -346,10 +430,23 @@ const InterviewPage = () => {
   const toggleAudio = () => {
     const newState = !audioEnabled;
     setAudioEnabled(newState);
+
     if (streamRef.current) {
       streamRef.current.getAudioTracks().forEach(track => {
         track.enabled = newState;
       });
+    }
+
+    if (!newState) {
+      // Muted: stop recognition immediately and mark not listening
+      SpeechService.stopListening();
+      setIsListening(false);
+    } else {
+      // Unmuted: if interview is active and we're not processing/AI-speaking, resume listening
+      if (isInterviewActive && !isProcessing && !isAISpeaking) {
+        SpeechService.startListening();
+        setIsListening(true);
+      }
     }
   };
 

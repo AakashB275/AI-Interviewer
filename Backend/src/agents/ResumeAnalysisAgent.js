@@ -14,9 +14,34 @@ export class ResumeAnalysisAgent {
     const t = this.text.toLowerCase();
 
     // Deterministic, simple heuristics (no LLM)
+    // Expanded skill detection to cover more technologies and frameworks
     const skills = [];
-    const knownSkills = ['javascript','js','node','react','python','java','sql','mongodb','docker','aws','git'];
-    knownSkills.forEach(s => { if (t.includes(s)) skills.push(s); });
+    const knownSkills = [
+      // Frontend
+      'javascript','js','typescript','ts','react','vue','angular','html','css','webpack','tailwind',
+      // Backend
+      'node','nodejs','express','python','django','java','spring','c#','csharp','php','ruby','go','golang','rust',
+      // Databases
+      'sql','mysql','postgres','postgresql','mongodb','firebase','redis','cassandra','dynamodb',
+      // Tools & Platforms
+      'docker','kubernetes','aws','azure','gcp','git','jenkins','gitlab','github','docker-compose',
+      // Other
+      'rest','graphql','api','microservices','testing','jest','mocha','pytest','linux','bash'
+    ];
+    
+    knownSkills.forEach(s => { 
+      if (t.includes(s)) {
+        // Avoid duplicates (e.g., 'js' and 'javascript', 'node' and 'nodejs')
+        if (s === 'js' && skills.includes('javascript')) return;
+        if (s === 'ts' && skills.includes('typescript')) return;
+        if (s === 'nodejs' && skills.includes('node')) return;
+        if (s === 'golang' && skills.includes('go')) return;
+        if (s === 'csharp' && skills.includes('c#')) return;
+        if (s === 'postgresql' && skills.includes('postgres')) return;
+        
+        skills.push(s);
+      }
+    });
 
     // Estimate years of experience from patterns like 'x years'
     let years = 0;
@@ -30,6 +55,7 @@ export class ResumeAnalysisAgent {
       summary,
       skills: Array.from(new Set(skills)),
       estimatedYearsExperience: years,
+      skillsDetected: Array.from(new Set(skills)).length,
       metadata: this.metadata
     };
   }

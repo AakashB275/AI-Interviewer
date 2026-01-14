@@ -1,9 +1,12 @@
 import InterviewSession from '../models/interviewSession.js';
 import { DocumentModel } from '../models/document.js';
-import vectorSearchService from '../services/vectorSearchService.js';
-import llmService from '../services/llmService.js';
 import { ResumeAnalysisAgent } from '../agents/ResumeAnalysisAgent.js';
 import { InterviewPlannerAgent } from '../agents/InterviewPlannerAgent.js';
+import interviewMessageService from '../services/interviewMessageService.js';
+import evaluationService from '../services/evaluationService.js';
+import { EvaluationAgent } from '../agents/EvaluationAgent.js';
+import { buildTranscript, getRubricForRole, generateDeterministicQuestion } from '../utils/interviewUtils.js';
+
 
 /**
  * START INTERVIEW
@@ -36,6 +39,25 @@ export async function startInterview(req, res) {
     });
     const resumeAnalysis = await resumeAnalysisAgent.run();
 
+    console.log('Resume Analysis Results:', {
+      yearsOfExperience: resumeAnalysis.estimatedYearsExperience,
+      skillsDetected: resumeAnalysis.skills,
+      skillCount: resumeAnalysis.skillsDetected
+    });
+
+    const planner = new InterviewPlannerAgent({
+      resumeAnalysis,
+      constraints: { role }
+    });
+    const interviewPlan = await planner.run();
+
+    console.log('Interview Plan Generated:', {
+      questionCount: interviewPlan.questionCount,
+      baseDifficulty: interviewPlan.baseDifficulty,
+      skills: interviewPlan.detectedSkills,
+      yearsOfExperience: interviewPlan.yearsOfExperience
+    });
+
     // Determine difficulty based on years of experience
     // This matches the logic in InterviewPlannerAgent:
     // years >= 5 ? 'hard' : years >= 2 ? 'medium' : 'easy'
@@ -48,39 +70,66 @@ export async function startInterview(req, res) {
       documentId,
       role,
       difficulty,
+      interviewPlan,
+      currentQuestionIndex: 0,
       status: 'active',
       startedAt: new Date()
     });
 
-    // Retrieve resume chunks (projects first)
-    const chunks = await vectorSearchService.search({
-      documentId,
-      query: 'most complex project and backend experience',
-      limit: 4
+    // Plan-driven first question (index 0) - deterministic, no LLM
+    const plan = interviewPlan;
+    const firstSpec = plan?.questions?.[0];
+    
+    console.log('startInterview - Generating first question:', {
+      firstSpec,
+      planLength: plan?.questions?.length,
+      difficulty
+    });
+    
+    // Generate question deterministically from plan spec
+    const question = generateDeterministicQuestion({
+      skill: firstSpec?.skill || 'general',
+      difficulty: firstSpec?.difficulty || difficulty,
+      role,
+      index: 0
     });
 
-    // Generate first question
-    const question = await llmService.generateQuestion({
-      role,
-      difficulty,
-      resumeChunks: chunks.map(chunk => ({ chunkText: chunk.chunkText || chunk.text || '' }))
-    });
+    console.log('Generated first question:', question);
 
     session.currentQuestion = {
       text: question.text,
       competency: question.competency,
-      difficulty,
+      difficulty: question.difficulty,
       askedAt: new Date()
     };
 
     await session.save();
 
-    return res.json({
-      success: true,
+    console.log('Session saved successfully:', {
       sessionId: session._id,
+      sessionIdType: typeof session._id,
+      sessionIdString: String(session._id)
+    });
+
+    await interviewMessageService.saveMessage({
+      sessionId: session._id,
+      role: 'interviewer',
+      content: question.text,
+      messageType: 'question',
+      jobRole: role,
+      difficulty
+    });
+
+    const responsePayload = {
+      success: true,
+      sessionId: String(session._id),  // Ensure it's a string
       question: question.text,
       difficulty // Return the determined difficulty
-    });
+    };
+
+    console.log('Returning response:', responsePayload);
+
+    return res.json(responsePayload);
   } catch (err) {
     console.error('startInterview error:', err);
     return res.status(500).json({ success: false, error: 'Failed to start interview' });
@@ -113,87 +162,116 @@ export async function submitAnswer(req, res) {
       return res.status(400).json({ success: false, error: 'No active question in session' });
     }
 
-    // Evaluate answer
-    const evaluation = await llmService.evaluateAnswer({
-      question: currentQuestion.text,
-      answer,
-      competency: currentQuestion.competency,
-      difficulty: currentQuestion.difficulty
-    });
-
-    // Save history
-    session.questionHistory.push({
-      text: currentQuestion.text,
-      competency: currentQuestion.competency,
-      difficulty: currentQuestion.difficulty,
-      evaluation: {
-        depth: evaluation.depth,
-        coverage: evaluation.coverage,
-        strengths: evaluation.strengths || [],
-        gaps: evaluation.gaps || [],
-        summary: evaluation.summary || '',
-        followUpRecommended: evaluation.followUpRecommended || false
-      }
-    });
-
-    // Update progress
-    session.progress = session.progress || {};
-    if (evaluation.gaps?.length) {
-      session.progress.weaknesses = [
-        ...(session.progress.weaknesses || []),
-        currentQuestion.competency
-      ];
-    } else {
-      session.progress.strengths = [
-        ...(session.progress.strengths || []),
-        currentQuestion.competency
-      ];
+    // Save candidate's answer
+    try {
+      await interviewMessageService.saveMessage({
+        sessionId,
+        role: 'candidate',
+        content: answer,
+        messageType: 'answer',
+        jobRole: session.role,
+        difficulty: session.difficulty
+      });
+    } catch (msgErr) {
+      console.error('Error saving candidate answer message:', msgErr);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to save answer message: ' + msgErr.message 
+      });
     }
 
-    // Decide next step
-    let nextQuestionText = null;
-    let nextQuestion = null;
+    // Plan-driven progression (no evaluation here)
+    const plan = session.interviewPlan;
+    if (!plan?.questions?.length) {
+      return res.status(500).json({ success: false, error: 'Interview plan missing from session' });
+    }
 
-    if (evaluation.followUpRecommended && evaluation.gaps?.length > 0) {
-      const followUpText = await llmService.generateFollowUp({
-        previousQuestion: currentQuestion.text,
-        gaps: evaluation.gaps
-      });
-      nextQuestionText = followUpText;
-      session.currentQuestion = {
-        text: followUpText,
-        competency: currentQuestion.competency, // Keep same competency for follow-up
-        difficulty: currentQuestion.difficulty,
-        askedAt: new Date()
-      };
-    } else {
-      const chunks = await vectorSearchService.search({
-        documentId: session.documentId,
-        query: 'next important skill or project',
-        limit: 3
-      });
+    const nextIndex = Number(session.currentQuestionIndex || 0) + 1;
+    if (nextIndex >= plan.questions.length) {
+      // Do NOT end the session here.
+      // Single exit point: frontend should call `endInterview` to finalize + evaluate.
+      return res.json({ success: true, interviewComplete: true });
+    }
 
-      nextQuestion = await llmService.generateQuestion({
+    const nextSpec = plan.questions[nextIndex];
+    
+    // Debug logging
+    console.log('submitAnswer - Generating next question:', {
+      nextIndex,
+      nextSpecSkill: nextSpec?.skill,
+      nextSpecDifficulty: nextSpec?.difficulty,
+      sessionRole: session.role,
+      planLength: plan.questions.length
+    });
+    
+    // Generate question deterministically from plan spec - no LLM decisions
+    let nextQuestion;
+    try {
+      nextQuestion = generateDeterministicQuestion({
+        skill: nextSpec?.skill || 'general',
+        difficulty: nextSpec?.difficulty || session.difficulty,
         role: session.role,
-        difficulty: session.difficulty,
-        resumeChunks: chunks.map(chunk => ({ chunkText: chunk.chunkText || chunk.text || '' }))
+        index: nextIndex
       });
-
-      nextQuestionText = nextQuestion.text;
-      session.currentQuestion = {
-        text: nextQuestion.text,
-        competency: nextQuestion.competency,
-        difficulty: session.difficulty,
-        askedAt: new Date()
-      };
+    } catch (qErr) {
+      console.error('Error generating question:', qErr);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to generate next question: ' + qErr.message 
+      });
     }
 
-    await session.save();
+    // Debug logging
+    console.log('Generated question:', nextQuestion);
+
+    // Validate that we got a valid question
+    if (!nextQuestion || !nextQuestion.text) {
+      console.error('Failed to generate question:', { nextSpec, nextIndex, nextQuestion });
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to generate next question' 
+      });
+    }
+
+    session.currentQuestionIndex = nextIndex;
+    session.currentQuestion = {
+      text: nextQuestion.text,
+      competency: nextQuestion.competency,
+      difficulty: nextQuestion.difficulty,
+      askedAt: new Date()
+    };
+
+    try {
+      await interviewMessageService.saveMessage({
+        sessionId,
+        role: 'interviewer',
+        content: nextQuestion.text,
+        messageType: 'question',
+        jobRole: session.role,
+        difficulty: nextQuestion.difficulty
+      });
+    } catch (msgErr) {
+      console.error('Error saving interviewer question message:', msgErr);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to save question message: ' + msgErr.message 
+      });
+    }
+
+    try {
+      await session.save();
+    } catch (saveErr) {
+      console.error('Error saving session:', saveErr);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to save session: ' + saveErr.message 
+      });
+    }
 
     return res.json({
       success: true,
-      feedback: evaluation.summary,
-      question: nextQuestionText
+      interviewComplete: false,
+      question: nextQuestion.text
     });
   } catch (err) {
     console.error('submitAnswer error:', err);
@@ -217,12 +295,44 @@ export async function endInterview(req, res) {
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
+    const messages = await interviewMessageService.getMessagesForSession(sessionId);
+
+    const transcript = buildTranscript(messages);
+    const rubric = getRubricForRole(session.role);
+
+    const evaluationAgent = new EvaluationAgent({
+      transcript,
+      rubric
+    });
+
+    const result = await evaluationAgent.run();
+
+    // Persist into our Evaluation model shape (0-10 scale, includes overall)
+    const scores10 = Object.fromEntries(
+      Object.entries(result.scores || {}).map(([k, v]) => [k, Math.max(0, Math.min(10, Number(v || 0) * 2))])
+    );
+    const overall10 = Math.max(0, Math.min(10, Number(result.overallScore || 0) * 2));
+
+    await evaluationService.saveEvaluation({
+      sessionId,
+      evaluator: 'AI',
+      scores: { ...scores10, overall: overall10 },
+      comments: result.notes
+    });
 
     session.status = 'ended';
     session.endedAt = new Date();
     await session.save();
 
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+      evaluation: {
+        overallScore: result.overallScore,
+        confidenceLevel: result.confidenceLevel,
+        scores: result.scores,
+        notes: result.notes
+      }
+    });
   } catch (err) {
     console.error('endInterview error:', err);
     return res.status(500).json({ success: false, error: 'Failed to end interview' });

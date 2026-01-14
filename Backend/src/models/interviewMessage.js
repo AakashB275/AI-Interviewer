@@ -9,25 +9,19 @@ const interviewMessageSchema = new mongoose.Schema({
 
   role: {
     type: String,
-    enum: ["candidate", "system"],
+    // interviewer is our backend "AI interviewer" voice; system is reserved for meta/instructions
+    enum: ["candidate", "interviewer", "system"],
     required: true
   },
 
-  jobRole: {
-    type: String,
-    required: true
-  },
+  // Optional metadata (kept non-required to avoid breaking runtime writes)
+  jobRole: { type: String },
+  difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
 
-  difficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    required: true
-  },
-
-  content: {
-    type: String,
-    required: true
-  },
+  // Canonical message payload
+  content: { type: String, required: true },
+  // Back-compat alias (older code wrote `message`)
+  message: { type: String },
 
   messageType: {
     type: String,
@@ -41,7 +35,8 @@ const interviewMessageSchema = new mongoose.Schema({
   //   temperature: Number
   // },
 
-  sequence: { type: Number, required: true },
+  // Optional ordering field; we mostly rely on createdAt sorting
+  sequence: { type: Number, default: 0 },
 
   createdAt: { type: Date, default: Date.now }
 });

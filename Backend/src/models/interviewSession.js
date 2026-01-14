@@ -9,10 +9,20 @@ const interviewSessionSchema = new mongoose.Schema({
     required: true
   },
 
-  jobrole: { type: String, required: true },
+  // Preferred field name used across controllers/services
+  role: { type: String, required: true },
+  // Back-compat: older field name (avoid breaking existing data)
+  jobrole: { type: String },
   difficulty: { type: String, enum: ['easy','medium','hard'], required: true },
 
   status: { type: String, enum: ['pending','active','paused','ended'], default: 'pending' },
+
+  interviewPlan: {
+    type: Object,
+    required: true
+  },
+
+  currentQuestionIndex: { type: Number, default: 0 },
 
   currentQuestion: {
     text: String,
@@ -34,16 +44,13 @@ const interviewSessionSchema = new mongoose.Schema({
       followUpRecommended: Boolean
     }
   }],
-
-  progress: {
-    competenciesCovered: [String],
-    strengths: [String],
-    weaknesses: [String]
-  },
-
+  
   startedAt: Date,
   endedAt: Date
 }, { timestamps: true });
+
+// Enforce plan immutability: once created, the plan must not change.
+interviewSessionSchema.path('interviewPlan').immutable(true);
 
 // Add indexes for common queries
 interviewSessionSchema.index({ user: 1, status: 1 });
