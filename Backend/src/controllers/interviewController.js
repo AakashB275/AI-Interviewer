@@ -447,13 +447,27 @@ export async function endInterview(req, res) {
     session.endedAt = new Date();
     await session.save();
 
+    // Return comprehensive analytics data
     return res.json({
       success: true,
+      sessionId: String(sessionId),
+      jobRole: session.role,
+      difficulty: session.difficulty,
+      durationSeconds: Math.floor((session.endedAt - session.startedAt) / 1000),
+      conversationHistory: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        type: m.messageType,
+        timestamp: m.createdAt
+      })),
       evaluation: {
         overallScore: result.overallScore,
         confidenceLevel: result.confidenceLevel,
-        scores: result.scores,
-        notes: result.notes
+        skillBreakdown: result.scores || {},
+        feedback: result.notes,
+        suggestions: Array.isArray(result.suggestions) ? result.suggestions : [result.notes],
+        strengths: result.strengths || [],
+        areasForImprovement: result.areasForImprovement || []
       }
     });
   } catch (err) {

@@ -466,5 +466,5 @@ Respond ONLY with a JSON object:
       };
     }
   }
-
+}
 export default new LLMService();

@@ -22,7 +22,7 @@ const InterviewPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [jobRole, setJobRole] = useState('');
-  const [difficulty, setDifficulty] = useState('medium');
+  // const [difficulty, setDifficulty] = useState('medium');
   const [documentId, setDocumentId] = useState(null);
   
   const videoRef = useRef(null);
@@ -195,13 +195,13 @@ const InterviewPage = () => {
         clearTimeout(silenceTimerRef.current);
       }
 
-      // Detect end of answer (2 seconds of silence)
+      // Detect end of answer (4 seconds of silence)
       silenceTimerRef.current = setTimeout(() => {
         console.log('Silence timeout triggered - calling handleAnswerComplete with:', final.trim());
         if (final.trim()) {
           handleAnswerComplete(final.trim());
         }
-      }, 2000);
+      }, 4000);
     }
   }, [sessionId]);
 
@@ -237,27 +237,26 @@ const InterviewPage = () => {
     }
   }, [isInterviewActive, sessionId, handleSpeechResult, handleSpeechError, handleInterrupt]);
 
-  const getNextQuestion = async () => {
-    if (!sessionId) {
-      console.error('No session ID available');
-      return;
-    }
+  // const getNextQuestion = async () => {
+  //   if (!sessionId) {
+  //     console.error('No session ID available');
+  //     return;
+  //   }
 
-    setIsProcessing(true);
+  //   setIsProcessing(true);
     
-    try {
-      // This will be called after submitting an answer
-      // The backend will return the next question
-      // For now, we'll handle this in handleAnswerComplete
-    } catch (error) {
-      console.error('Error getting question:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  //   try {
+  //     // This will be called after submitting an answer
+  //     // The backend will return the next question
+  //     // For now, we'll handle this in handleAnswerComplete
+  //   } catch (error) {
+  //     console.error('Error getting question:', error);
+  //   } finally {
+  //     setIsProcessing(false);
+  //   }
+  // };
 
   const handleAnswerComplete = async (answer) => {
-    console.log('=== handleAnswerComplete called ===');
     console.log('Current sessionId value:', sessionId);
     console.log('sessionId type:', typeof sessionId);
     console.log('Answer received:', answer);
@@ -303,7 +302,7 @@ const InterviewPage = () => {
         try {
           errorData = await response.json();
         } catch (e) {
-          errorData = { error: 'Could not parse error response' };
+          errorData = { error: 'Could not parse error response' ,e};
         }
         console.error('Server error response:', response.status, errorData);
         const errorMsg = errorData?.error || `Server error: ${response.status}`;
@@ -393,12 +392,28 @@ const InterviewPage = () => {
         });
 
         if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.evaluation) {
-            evaluation = data.evaluation;
-            console.log('Interview evaluation:', evaluation);
-          }
-        }
+              const data = await response.json();
+              if (data.success && data.evaluation) {
+                evaluation = data.evaluation;
+                // Capture the full analytics payload returned by the server
+                const analyticsPayload = {
+                  sessionId: data.sessionId,
+                  jobRole: data.jobRole,
+                  difficulty: data.difficulty,
+                  durationSeconds: data.durationSeconds,
+                  conversationHistory: data.conversationHistory || [],
+                  evaluation: data.evaluation
+                };
+
+                console.log('Interview evaluation:', evaluation);
+
+                // Navigate to Users page and pass the analytics payload so it can be displayed
+                navigate('/users', { state: { recentAnalytics: analyticsPayload } });
+
+                // Stop here since we already navigated away
+                return;
+              }
+            }
       } catch (error) {
         console.error('Error ending interview:', error);
       }
@@ -410,21 +425,11 @@ const InterviewPage = () => {
     }
 
     // Show evaluation summary or navigate to results page
+    // If we reached this point without navigating, fall back to showing basic summary
     if (evaluation) {
-      const summary = `
-Interview Complete!
-
-Overall Score: ${evaluation.overallScore || 'N/A'}/5.0
-Confidence Level: ${evaluation.confidenceLevel || 'N/A'}
-
-Feedback:
-${evaluation.notes || 'No additional feedback'}
-      `.trim();
-      
-      alert(summary);
-      
-      // Optionally navigate to a results page
-      // navigate('/interview-results', { state: { evaluation } });
+      const summary = `Interview Complete! Overall Score: ${evaluation.overallScore || 'N/A'}`;
+      // Still log to console for debugging
+      console.log(summary);
     }
   };
 

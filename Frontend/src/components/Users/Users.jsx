@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -34,11 +35,17 @@ function Users() {
     uploadedFiles: []
   });
   const [deletingFile, setDeletingFile] = useState(null);
+  const location = useLocation();
+  const [recentAnalytics, setRecentAnalytics] = useState(null);
 
   useEffect(() => {
     fetchUserData();
     fetchResumeStatus();
     fetchAnalytics();
+    // If navigated with recent analytics payload, use it to display session details immediately
+    if (location?.state?.recentAnalytics) {
+      setRecentAnalytics(location.state.recentAnalytics);
+    }
   }, []);
 
   const fetchUserData = async () => {
@@ -148,6 +155,9 @@ function Users() {
         const data = await response.json();
         if (data.success) {
           setAnalytics(data);
+          if (data.recentSession) {
+            setRecentAnalytics(data.recentSession);
+          }
         } else {
           setError(data.error || 'Failed to load analytics');
         }
@@ -191,6 +201,13 @@ function Users() {
     return 'bg-red-100';
   };
 
+  const getRecentEvalFields = (evalObj) => {
+    if (!evalObj) return { skillBreakdown: {}, suggestions: [] };
+    const skillBreakdown = evalObj.skillBreakdown || evalObj.scores || {};
+    const suggestions = evalObj.suggestions && evalObj.suggestions.length ? evalObj.suggestions : (evalObj.comments ? [evalObj.comments] : (evalObj.feedback ? (Array.isArray(evalObj.feedback) ? evalObj.feedback : [evalObj.feedback]) : []));
+    return { skillBreakdown, suggestions };
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -226,9 +243,9 @@ function Users() {
             </div>
 
             {/* Profile Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center gap-3">
+                <div className="flex place-items-center gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
                     <FileText className="w-5 h-5 text-blue-600" />
                   </div>
@@ -254,7 +271,7 @@ function Users() {
                 </div>
               </div>
 
-              {resumeStatus.dataType && (
+              {/* {resumeStatus.dataType && (
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg">
@@ -268,7 +285,7 @@ function Users() {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {resumeStatus.lastUpdated && (
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -381,6 +398,11 @@ function Users() {
             <h2 className="text-2xl font-bold text-gray-900">Analytics & Performance</h2>
           </div>
 
+              {/* Admin link */}
+              <div className="flex items-center justify-end">
+                <a href="/admin" className="text-sm text-blue-600 hover:underline">Admin Dashboard</a>
+              </div>
+
           {loading ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -400,6 +422,92 @@ function Users() {
           ) : (
             <>
               {/* Key Metrics Cards */}
+              {/* Recent Session Details (from just-completed interview) */}
+              {recentAnalytics && (
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Session</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Role</p>
+                      <p className="font-medium text-gray-900">{recentAnalytics.jobRole}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Difficulty</p>
+                      <p className="font-medium text-gray-900 capitalize">{recentAnalytics.difficulty}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Duration</p>
+                      <p className="font-medium text-gray-900">{recentAnalytics.durationSeconds || 0}s</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Session ID</p>
+                      <p className="font-medium text-gray-900 truncate">{recentAnalytics.sessionId}</p>
+                    </div>
+                  </div>
+
+                  {/* Skill breakdown */}
+                  {(() => {
+                    const { skillBreakdown} = getRecentEvalFields(recentAnalytics.evaluation);
+                    const keys = Object.keys(skillBreakdown || {});
+                    return (
+                      <>
+                        {keys.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Skill Breakdown</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {keys.map((skill) => {
+                                const raw = skillBreakdown[skill];
+                                const numeric = Number(raw) || 0;
+                                const display = numeric > 10 ? numeric : numeric * 10; // normalize 0-10 -> 0-100
+                                return (
+                                  <div key={skill} className="border border-gray-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-sm font-medium text-gray-700 capitalize">{skill.replace(/([A-Z])/g, ' $1').trim()}</div>
+                                      <div className="text-sm font-semibold text-gray-900">{display.toFixed(1)}%</div>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                      <div className={`h-2.5 rounded-full ${display >= 80 ? 'bg-green-500' : display >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(display, 100)}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Suggestions / Feedback */}
+                        {/* <div className="mb-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Suggestions & Feedback</h4>
+                          <div className="space-y-2">
+                            {suggestions && suggestions.length > 0 ? (
+                              suggestions.map((s, i) => (
+                                <div key={i} className="p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-800">{s}</div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-gray-600">No suggestions provided.</div>
+                            )}
+                          </div>
+                        </div> */}
+                      </>
+                    );
+                  })()}
+
+                  {/* Conversation History */}
+                  {/* {recentAnalytics.conversationHistory && recentAnalytics.conversationHistory.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Conversation History</h4>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {recentAnalytics.conversationHistory.map((m, idx) => (
+                          <div key={idx} className={`p-2 rounded-lg ${m.role === 'interviewer' ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-green-50 border-l-4 border-green-500'}`}>
+                            <p className="text-xs text-gray-500">{m.role === 'interviewer' ? 'Interviewer' : 'You'}</p>
+                            <p className="text-sm text-gray-800">{m.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )} */}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Total Interviews */}
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow">

@@ -8,6 +8,8 @@ import Home from './components/Home/Home'
 import Layout from './layout.jsx'
 import Contact from './components/Contact/Contact.jsx'
 import Users from './components/Users/Users.jsx'
+import AdminDashboard from './components/Admin/AdminDashboard.jsx'
+import ProtectedRoute from './components/ProtectedRoute.jsx'
 import LandingPage from './components/Home/LandingPage'
 import Reviews from './components/Reviews/Reviews'
 import Pricing from './components/Pricing/Pricing'
@@ -30,6 +32,7 @@ const router  = createBrowserRouter(
       <Route path = 'reviews' element = {<Reviews/>}/>
       <Route path = 'pricing' element = {<Pricing/>}/>
       <Route path = 'interview' element = {<InterviewPage/>}/>
+      <Route path = 'admin' element = {<ProtectedRoute><AdminDashboard/></ProtectedRoute>} />
       
     </Route>
     </>

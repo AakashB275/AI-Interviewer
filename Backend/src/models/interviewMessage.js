@@ -25,7 +25,7 @@ const interviewMessageSchema = new mongoose.Schema({
 
   messageType: {
     type: String,
-    enum: ["question", "answer", "instruction", "feedback"],
+    enum: ["question", "answer", "instruction", "feedback", "follow-up"],
     default: "answer"
   },
 
