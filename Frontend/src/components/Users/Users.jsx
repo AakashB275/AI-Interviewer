@@ -20,6 +20,7 @@ import {
   File,
   AlertCircle
 } from 'lucide-react';
+import { Edit3, Check, X } from 'lucide-react';
 
 function Users() {
   const { user, setUser } = useAuth();
@@ -35,6 +36,10 @@ function Users() {
     uploadedFiles: []
   });
   const [deletingFile, setDeletingFile] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState(null);
   const location = useLocation();
   const [recentAnalytics, setRecentAnalytics] = useState(null);
 
@@ -137,6 +142,48 @@ function Users() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const handleStartEditName = () => {
+    setNewUserName(user?.userName || '');
+    setNameError(null);
+    setIsEditingName(true);
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setNameError(null);
+    setNewUserName('');
+  };
+
+  const handleSaveName = async () => {
+    if (!newUserName || newUserName.trim().length === 0) {
+      setNameError('Username cannot be empty');
+      return;
+    }
+    setSavingName(true);
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: newUserName.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUser(data.user);
+        setIsEditingName(false);
+        setNameError(null);
+        alert('Username updated');
+      } else {
+        setNameError(data.error || 'Failed to update username');
+      }
+    } catch (err) {
+      console.error('Error updating username:', err);
+      setNameError('Failed to update username');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const getFileIcon = (mimetype) => {
     if (mimetype?.includes('pdf')) return <File className="text-red-500" size={18} />;
     if (mimetype?.includes('word') || mimetype?.includes('document')) return <FileText className="text-blue-500" size={18} />;
@@ -224,9 +271,47 @@ function Users() {
               </div>
               
               <div className="flex-1 pb-2">
-                <h1 className="text-3xl font-bold text-gray-900 mb-5">
-                  {user?.userName || 'User'}
-                </h1>
+                <div className="flex items-center gap-3">
+                  {!isEditingName ? (
+                    <>
+                      <h1 className="text-3xl font-bold text-gray-900 mb-5">
+                        {user?.userName || 'User'}
+                      </h1>
+                      <button
+                        onClick={handleStartEditName}
+                        title="Edit username"
+                        className="ml-2 p-1 rounded-md text-gray-500 hover:bg-gray-100"
+                      >
+                        <Edit3 className="w-5 h-5" />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={newUserName}
+                        onChange={(e) => setNewUserName(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-md text-lg"
+                        placeholder="Enter username"
+                      />
+                      <button
+                        onClick={handleSaveName}
+                        disabled={savingName}
+                        className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-60"
+                        title="Save username"
+                      >
+                        {savingName ? 'Saving...' : <Check className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={handleCancelEditName}
+                        className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {nameError && <p className="text-xs text-red-500 mt-2">{nameError}</p>}
                 <div className="flex flex-wrap items-center gap-4 text-gray-600">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
@@ -397,11 +482,6 @@ function Users() {
             <BarChart3 className="w-6 h-6 text-blue-600" />
             <h2 className="text-2xl font-bold text-gray-900">Analytics & Performance</h2>
           </div>
-
-              {/* Admin link */}
-              <div className="flex items-center justify-end">
-                <a href="/admin" className="text-sm text-blue-600 hover:underline">Admin Dashboard</a>
-              </div>
 
           {loading ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">

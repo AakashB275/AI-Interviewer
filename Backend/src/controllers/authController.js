@@ -2,6 +2,7 @@ import userModel from '../models/user.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { sendWelcomeEmail } from '../services/emailService.js';
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
@@ -60,6 +61,9 @@ export const registerUser = async function (req, res) {
             contact
         });
 
+        sendWelcomeEmail({ to: user.email, userName: user.userName }).catch(err =>
+            console.error('Background email error:', err.message)
+        );
         let token = generateToken(user);
         
         res.cookie("token", token, {
@@ -163,6 +167,41 @@ export const getCurrentUser = async function(req, res) {
             success: false,
             error: err.message 
         });
+    }
+}
+
+export const updateCurrentUser = async function (req, res) {
+    try {
+        const userId = req.user && req.user._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        const { userName, contact } = req.body;
+
+        // Only allow updating certain fields; require at least one
+        if (!userName && !contact) {
+            return res.status(400).json({ success: false, error: 'No updatable fields provided' });
+        }
+
+        // If username provided, ensure it's not taken by another user
+        if (userName) {
+            const existing = await userModel.findOne({ userName });
+            if (existing && existing._id.toString() !== userId.toString()) {
+                return res.status(409).json({ success: false, error: 'Username already taken' });
+            }
+        }
+
+        const updates = {};
+        if (userName) updates.userName = userName;
+        if (contact) updates.contact = contact;
+
+        const updated = await userModel.findByIdAndUpdate(userId, { $set: updates }, { new: true }).select('-password');
+
+        return res.status(200).json({ success: true, user: updated });
+    } catch (err) {
+        console.error('Error updating user:', err);
+        return res.status(500).json({ success: false, error: err.message });
     }
 }
 

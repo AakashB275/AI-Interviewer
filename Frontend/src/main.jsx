@@ -14,7 +14,7 @@ import LandingPage from './components/Home/LandingPage'
 import Reviews from './components/Reviews/Reviews'
 import Pricing from './components/Pricing/Pricing'
 import InterviewPage from './components/Interview/InterviewPage'
-
+import OAuthCallback from './components/OAuthCallback'
 
 const router  = createBrowserRouter(
   createRoutesFromElements(
@@ -28,11 +28,12 @@ const router  = createBrowserRouter(
       <Route path = 'home/:userid' element = {<Home/>}/>
       <Route path = 'home' element = {<Home/>}/>
       <Route path = 'contact' element = {<Contact/>}/>
-      <Route path = 'user/:userid' element = {<Users/>}/>
+      <Route path = 'user/:userid' element = {<ProtectedRoute><Users/></ProtectedRoute>}/>
       <Route path = 'reviews' element = {<Reviews/>}/>
       <Route path = 'pricing' element = {<Pricing/>}/>
       <Route path = 'interview' element = {<InterviewPage/>}/>
       <Route path = 'admin' element = {<ProtectedRoute><AdminDashboard/></ProtectedRoute>} />
+      <Route path="oauth-callback" element={<OAuthCallback />} />
       
     </Route>
     </>

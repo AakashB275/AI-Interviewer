@@ -17,12 +17,17 @@ const userSchema = mongoose.Schema({
     },
     password : {
         type: String,
-        required: true,
+        required: function() {
+            // required only when not an OAuth user (no googleId present)
+            return !(this.userTrainingData && this.userTrainingData.googleId);
+        },
         minlength: 6
     },
     contact : {
         type: String, // Changed to String for international support
-        required: true
+        required: function() {
+            return !(this.userTrainingData && this.userTrainingData.googleId);
+        }
     },
     userTrainingData: {
         hasUploadedData: {
@@ -50,6 +55,15 @@ const userSchema = mongoose.Schema({
             type: Date,
             default: Date.now
         },
+
+        googleId: {
+            type: String,
+            sparse: true   // allows multiple null values (non-OAuth users)
+        },
+        avatar: {
+            type: String,
+            default: null
+        }
     }
 })
 

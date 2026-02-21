@@ -48,48 +48,48 @@ export async function generateEmbedding(text){
     }
 }
 
-//gemini version incase openai key fails, have to change this part manually
+// gemini version incase openai key fails, have to change this part manually
 
-// export function getGeminiClient() {
-//   if (!process.env.GOOGLE_API_KEY) {
-//     console.error("GOOGLE_API_KEY is missing");
-//     throw new Error("Gemini API key not configured");
-//   }
+export function getGeminiClient() {
+  if (!process.env.GOOGLE_API_KEY) {
+    console.error("GOOGLE_API_KEY is missing");
+    throw new Error("Gemini API key not configured");
+  }
 
-//   if (!client) {
-//     client = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-//   }
+  if (!client) {
+    client = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+  }
 
-//   return client;
-// }
+  return client;
+}
 
-// export async function generateEmbedding(text) {
-//   try {
-//     const genAI = getGeminiClient();
+export async function generateEmbedding(text) {
+  try {
+    const genAI = getGeminiClient();
 
-//     const model = genAI.getGenerativeModel({
-//       model: "text-embedding-004", 
-//     });
+    const model = genAI.getGenerativeModel({
+      model: "text-embedding-004", 
+    });
 
-//     const result = await model.embedContent(text);
+    const result = await model.embedContent(text);
 
-//     const embedding = result?.embedding?.values;
+    const embedding = result?.embedding?.values;
 
-//     if (!embedding || embedding.length === 0) {
-//       console.error("Embedding generated but empty");
-//       throw new Error("Empty embedding received");
-//     }
+    if (!embedding || embedding.length === 0) {
+      console.error("Embedding generated but empty");
+      throw new Error("Empty embedding received");
+    }
 
-//     console.log("Embedding generated:", embedding.length);
-//     return embedding;
-//   } catch (err) {
-//     if (err.message?.includes("fetch failed")) {
-//       console.error("Network error: No internet connection");
-//     } else if (err.status === 401 || err.message?.includes("API key")) {
-//       console.error("Invalid Gemini API Key");
-//     } else {
-//       console.error("Gemini embedding error:", err.message);
-//     }
-//     throw err;
-//   }
-// }
+    console.log("Embedding generated:", embedding.length);
+    return embedding;
+  } catch (err) {
+    if (err.message?.includes("fetch failed")) {
+      console.error("Network error: No internet connection");
+    } else if (err.status === 401 || err.message?.includes("API key")) {
+      console.error("Invalid Gemini API Key");
+    } else {
+      console.error("Gemini embedding error:", err.message);
+    }
+    throw err;
+  }
+}

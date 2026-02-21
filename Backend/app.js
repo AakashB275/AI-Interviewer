@@ -8,6 +8,8 @@ import { connectDB } from './src/loaders/db.js';
 import apiRouter from './src/routes/api.js';
 import rateLimit from 'express-rate-limit';
 import requestLogger from './src/middlewares/requestLogger.js';
+import './src/services/passportConfig.js';
+import passport from 'passport';
 
 dotenv.config();
 
@@ -42,6 +44,8 @@ app.use(requestLogger);
 console.log('✅ Rate limiting configured');
 
 await connectDB();
+
+app.use(passport.initialize());
 
 app.use("/api", apiRouter);
 

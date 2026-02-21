@@ -379,7 +379,8 @@ const InterviewPage = () => {
     SpeechService.stopSpeaking();
     setIsInterviewActive(false);
     setIsListening(false);
-    
+    setIsProcessing(true);
+
     // End interview session - this also evaluates the interview
     let evaluation = null;
     if (sessionId) {
@@ -407,6 +408,7 @@ const InterviewPage = () => {
 
                 console.log('Interview evaluation:', evaluation);
 
+                setIsProcessing(false);
                 // Navigate to Users page and pass the analytics payload so it can be displayed
                 navigate('/users', { state: { recentAnalytics: analyticsPayload } });
 
@@ -418,6 +420,8 @@ const InterviewPage = () => {
         console.error('Error ending interview:', error);
       }
     }
+
+    setIsProcessing(false);
 
     // Stop media
     if (streamRef.current) {
