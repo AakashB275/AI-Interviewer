@@ -162,7 +162,7 @@ class SpeechService {
    * Enhance text with natural pauses and emphasis
    * @private
    */
-  _enhanceText(text, options = {}) {
+  _enhanceText(text = {}) {
     let enhanced = text;
 
     // Add pauses after punctuation for natural flow

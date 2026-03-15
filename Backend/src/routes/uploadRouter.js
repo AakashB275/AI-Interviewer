@@ -1,21 +1,28 @@
 import express from 'express';
-import isLoggedIn from '../middlewares/isLoggedin.js';
-import { uploadUserData, getUserTrainingStatus, deleteUserFile, upload } from '../controllers/uploadController.js';
+import multer from 'multer';
+import isLoggedin from '../middlewares/isLoggedin.js';
+import {
+  getUploadStatus,
+  uploadTrainData
+} from '../controllers/uploadController.js';
 
 const router = express.Router();
 
-// Get user training status
-router.get("/status", isLoggedIn, getUserTrainingStatus);
-
-// Upload user training data
-router.post("/train-data", isLoggedIn, upload.array('trainingFiles'), uploadUserData);
-
-// Delete specific file
-router.delete("/file/:filename", isLoggedIn, deleteUserFile);
-
-// Test route
-router.get("/", (req, res) => {
-  res.json({ message: "Upload API is working!" });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
 });
 
+router.get('/status', isLoggedin, getUploadStatus);
+
+router.post(
+  '/train-data',
+  isLoggedin,
+  upload.array('trainingFiles'),
+  uploadTrainData
+);
+
 export default router;
+
