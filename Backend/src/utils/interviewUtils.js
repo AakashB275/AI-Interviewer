@@ -58,6 +58,22 @@ export function normalizePlanDifficulty(planDifficulty, fallback = 'medium') {
   return fallback;
 }
 
+const MAX_QUESTION_CHARS = 180;
+
+function shortenQuestionText(text, maxChars = MAX_QUESTION_CHARS) {
+  if (text == null) return '';
+  const normalized = String(text).trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  if (normalized.length <= maxChars) return normalized;
+
+  const candidate = normalized.slice(0, maxChars).trim();
+  const lastQ = candidate.lastIndexOf('?');
+  const lastEnd = Math.max(candidate.lastIndexOf('!'), candidate.lastIndexOf('.'));
+  const last = Math.max(lastQ, lastEnd);
+  if (last >= 0) return candidate.slice(0, last + 1).trim();
+  return candidate;
+}
+
 /**
  * Deterministic question generator based on plan spec (skill + difficulty).
  * No LLM decisions - purely index-based progression.
@@ -207,12 +223,13 @@ export function generateDeterministicQuestion({ skill = 'general', difficulty = 
 
   // Ensure questionSet is valid
   if (!Array.isArray(questionSet) || questionSet.length === 0) {
-    console.error('Invalid questionSet:', { skill, normalizedDiff, skillLower, questionSet });
+    // console.error('Invalid questionSet:', { skill, normalizedDiff, skillLower, questionSet });
     questionSet = templates.general.medium; // Fallback to medium difficulty general questions
   }
 
   // Deterministic selection based on index
   const questionText = questionSet[index % questionSet.length];
+  const shortText = shortenQuestionText(questionText) || questionText;
   
   // Use skill as competency (capitalize first letter)
   const competency = skill === 'general' 
@@ -220,7 +237,7 @@ export function generateDeterministicQuestion({ skill = 'general', difficulty = 
     : skill.charAt(0).toUpperCase() + skill.slice(1);
 
   return {
-    text: questionText,
+    text: shortText,
     competency,
     difficulty: normalizedDiff
   };

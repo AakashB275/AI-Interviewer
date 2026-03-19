@@ -68,7 +68,7 @@ function FeatureCard({ title, description, icon, gradient, delay, onClick, badge
         </div>
       )}
       
-      <div className="relative z-10 p-8 h-full flex flex-col justify-between min-h-[280px]">
+      <div className="relative z-10 p-8 h-full flex flex-col justify-between min-h-70">
         {badge && !disabled && (
           <div className="absolute top-4 right-4">
             <span className="bg-white/90 text-gray-800 px-3 py-1 rounded-full text-sm font-medium shadow-sm">
@@ -120,7 +120,6 @@ function StatCard({ icon, label, value, colorClass }) {
 }
 
 function Home() {
-  const [showStats, setShowStats] = useState(false);
   const [isTrainAIDialogOpen, setIsTrainAIDialogOpen] = useState(false);
   const [isJobRoleDialogOpen, setIsJobRoleDialogOpen] = useState(false);
   const [hasResume, setHasResume] = useState(false);
@@ -157,11 +156,6 @@ function Home() {
       checkResumeStatus();
     }
   }, [isLoggedIn]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowStats(true), 800);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleStartInterview = () => {
     if (!isLoggedIn) {
@@ -282,15 +276,6 @@ function Home() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Stats Section */}
-            <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 transition-all duration-700 transform ${
-              showStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-            }`}>
-              <StatCard icon={<Users size={20} className="text-blue-600" />} label="Active Users" value="10,000+" colorClass="bg-blue-100" />
-              <StatCard icon={<Target size={20} className="text-green-600" />} label="Success Rate" value="94%" colorClass="bg-green-100" />
-              <StatCard icon={<Star size={20} className="text-yellow-600" />} label="Avg Rating" value="4.9/5" colorClass="bg-yellow-100" />
             </div>
           </div>
         </div>

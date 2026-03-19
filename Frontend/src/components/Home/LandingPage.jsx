@@ -1,4 +1,4 @@
-import React, { useState, useEffect }  from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
@@ -17,14 +17,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-function SwiperReview({ name, role, company, rating, review, avatar, date, gradient, delay, verified }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
+function SwiperReview({ name, role, company, rating, review, date, gradient, verified }) {
 
   return (
     <div className="relative overflow-hidden rounded-2xl shadow-xl transition-all duration-700 transform">
@@ -33,7 +26,7 @@ function SwiperReview({ name, role, company, rating, review, avatar, date, gradi
       {/* Subtle overlay for depth */}
       <div className="absolute inset-0 bg-white/5 transition-all duration-300"></div>
 
-      <div className="relative z-10 p-6 h-full flex flex-col min-h-[320px]">
+      <div className="relative z-10 p-6 h-full flex flex-col min-h-80">
         {verified && (
           <div className="absolute top-4 right-4">
             <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 shadow-sm">
@@ -127,7 +120,7 @@ function LandingPage() {
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-6xl mx-auto px-6 py-16">
-        <h1 className="text-4xl font-bold text-gray-900">Welcome to TrainMeAI</h1>
+        <h1 className="text-4xl font-bold text-blue-700">Welcome to TrainMeAI</h1>
         <p className="mt-4 text-xl text-gray-700">
           Transforming Recruitment with AI Interview Platform
         </p>
@@ -155,7 +148,7 @@ function LandingPage() {
         >
           {reviews.map((review, index) => (
   <SwiperSlide key={index}>
-    <SwiperReview {...review} delay={0} />
+    <SwiperReview {...review} />
   </SwiperSlide>
 ))}
 

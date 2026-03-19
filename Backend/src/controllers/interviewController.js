@@ -21,11 +21,11 @@ async function getResumeChunks(documentId, query, limit = 4) {
   if (!documentId || !query) return [];
   try {
     const chunks = await vectorSearchService.search({ documentId, query, limit });
-    console.log(`Vector search for "${query}": found ${chunks.length} chunks`);
+    // console.log(`Vector search for "${query}": found ${chunks.length} chunks`);
     return chunks || [];
   } catch (err) {
     // Vector search failure must NEVER crash the interview
-    console.warn('Vector search failed (falling back to generic questions):', err.message);
+    // console.warn('Vector search failed (falling back to generic questions):', err.message);
     return [];
   }
 }
@@ -53,19 +53,19 @@ export async function startInterview(req, res) {
     });
     const resumeAnalysis = await resumeAnalysisAgent.run();
 
-    console.log('Resume Analysis:', {
-      years:  resumeAnalysis.estimatedYearsExperience,
-      skills: resumeAnalysis.skills
-    });
+    // console.log('Resume Analysis:', {
+    //   years:  resumeAnalysis.estimatedYearsExperience,
+    //   skills: resumeAnalysis.skills
+    // });
 
     const planner = new InterviewPlannerAgent({ resumeAnalysis, constraints: { role } });
     const interviewPlan = planner.run();
 
-    console.log('Interview Plan:', {
-      questionCount: interviewPlan.questionCount,
-      difficulty:    interviewPlan.baseDifficulty,
-      skills:        interviewPlan.detectedSkills
-    });
+    // console.log('Interview Plan:', {
+    //   questionCount: interviewPlan.questionCount,
+    //   difficulty:    interviewPlan.baseDifficulty,
+    //   skills:        interviewPlan.detectedSkills
+    // });
 
     const years = Number(resumeAnalysis.estimatedYearsExperience || 0);
     const difficulty = years >= 5 ? 'hard' : years >= 2 ? 'medium' : 'easy';
@@ -205,7 +205,7 @@ export async function submitAnswer(req, res) {
     const llmService = (await import('../services/llmService.js')).default;
 
     if (shouldFollowUp) {
-      console.log('Asking follow-up for depth — answerCount:', answerCount, 'brief:', isBriefAnswer);
+      // console.log('Asking follow-up for depth — answerCount:', answerCount, 'brief:', isBriefAnswer);
 
       const followUpSkill = currentQuestion.competency || currentQuestion.skill || 'general';
       const resumeChunks = await getResumeChunks(
@@ -285,7 +285,7 @@ export async function submitAnswer(req, res) {
       4
     );
 
-    console.log('Next question spec:', { nextIndex, skill: nextSkill, difficulty: nextSpec?.difficulty });
+    // console.log('Next question spec:', { nextIndex, skill: nextSkill, difficulty: nextSpec?.difficulty });
 
     let nextQuestion;
     try {

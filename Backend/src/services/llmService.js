@@ -54,6 +54,23 @@ function parseJSON(text) {
   return JSON.parse(match[0]);
 }
 
+const MAX_QUESTION_CHARS = 180;
+
+function shortenQuestionText(text, maxChars = MAX_QUESTION_CHARS) {
+  if (text == null) return '';
+  const normalized = String(text).trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  if (normalized.length <= maxChars) return normalized;
+
+  const candidate = normalized.slice(0, maxChars).trim();
+  // Prefer cutting at the last sentence-ending punctuation within the limit.
+  const lastQ = candidate.lastIndexOf('?');
+  const lastEnd = Math.max(candidate.lastIndexOf('!'), candidate.lastIndexOf('.'));
+  const last = Math.max(lastQ, lastEnd);
+  if (last >= 0) return candidate.slice(0, last + 1).trim();
+  return candidate;
+}
+
 async function callLLM({ systemPrompt, userPrompt, temperature = 0.7, maxTokens, jsonMode = false }) {
   const provider = (process.env.LLM_PROVIDER || 'groq').toLowerCase();
 
@@ -112,6 +129,7 @@ Rules:
 - The question must be answerable in 2-3 minutes
 - Do NOT ask generic textbook questions if resume context is available
 - Make the candidate feel you've read their resume
+- Keep it concise: 1 short sentence, <= 180 characters
 
 Respond ONLY with:
 {
@@ -124,14 +142,14 @@ Respond ONLY with:
       const raw = await callLLM({ systemPrompt, userPrompt, temperature: 0.7, jsonMode: true });
       const q = parseJSON(raw);
       return {
-        text:       q.text       || `Tell me about your experience with ${role}.`,
+        text:       shortenQuestionText(q.text) || `Tell me about your experience with ${role}.`,
         competency: q.competency || 'General',
         difficulty: q.difficulty || difficulty
       };
     } catch (err) {
       console.error('generateQuestion failed:', err.message);
       return {
-        text:       `Tell me about your experience with ${role} and what interests you about this position.`,
+        text:       shortenQuestionText(`Tell me about your experience with ${role} and what interests you about this position.`),
         competency: 'General',
         difficulty
       };
@@ -185,14 +203,14 @@ Respond ONLY with:
   async generateFollowUp({ previousQuestion, gaps = [] } = {}) {
     if (!previousQuestion) throw new Error('previousQuestion is required');
 
-    const systemPrompt = 'You are an expert interviewer. Respond with only a single follow-up question.';
+    const systemPrompt = 'You are an expert interviewer. Respond with only a single follow-up question (<= 180 characters, 1 sentence).';
     const userPrompt = `Generate a follow-up question addressing these gaps: ${gaps.join(', ')}
 Previous question: ${previousQuestion}
 Respond with ONLY the question text.`;
 
     try {
       const text = await callLLM({ systemPrompt, userPrompt, temperature: 0.7, maxTokens: 150 });
-      return text.trim() || 'Can you elaborate on that?';
+      return shortenQuestionText(text) || 'Can you elaborate on that?';
     } catch (err) {
       console.error('generateFollowUp failed:', err.message);
       return 'Can you elaborate on that?';
@@ -251,6 +269,7 @@ The follow-up should:
 - Ask for specific examples, numbers, tools, or outcomes
 - NOT repeat any previous question
 - Show you were actively listening
+- Keep it short: <= 180 characters, 1 sentence
 
 Respond ONLY with JSON:
 {
@@ -276,6 +295,7 @@ Rules:
 - Be specific — reference the candidate's actual resume/answer, not generic knowledge
 - Do NOT repeat previous questions
 - Difficulty: ${difficulty}
+- Keep it concise: <= 180 characters, 1 sentence
 
 Respond ONLY with JSON:
 {
@@ -289,14 +309,14 @@ Respond ONLY with JSON:
       const raw = await callLLM({ systemPrompt, userPrompt, temperature: 0.8, jsonMode: true });
       const q = parseJSON(raw);
       return {
-        text:       q.text       || 'Tell me more about that.',
+        text:       shortenQuestionText(q.text) || 'Tell me more about that.',
         competency: q.competency || capitalizedSkill,
         difficulty: q.difficulty || difficulty
       };
     } catch (err) {
-      console.error('generateFollowUpQuestion failed:', err.message);
+      // console.error('generateFollowUpQuestion failed:', err.message);
       return {
-        text:       'Tell me more about what you just said.',
+        text:       shortenQuestionText('Tell me more about what you just said.'),
         competency: capitalizedSkill,
         difficulty
       };

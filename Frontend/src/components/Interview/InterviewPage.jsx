@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
 import { useAuth } from '../../context/AuthContext';
-import femaleInterviewerImage from '../../assets/female_interviewer.png';
+import femaleInterviewerImage from '../../assets/young interviewer.png';
 
 const InterviewPage = () => {
   const { user, setUser } = useAuth();
@@ -31,7 +31,7 @@ const InterviewPage = () => {
 
   // Log sessionId changes
   useEffect(() => {
-    console.log('📊 sessionId changed:', sessionId);
+    // console.log('📊 sessionId changed:', sessionId);
   }, [sessionId]);
 
   // Small helper to create deliberate pauses (e.g., AI responds 2s after user stops)
@@ -132,9 +132,9 @@ const InterviewPage = () => {
 
       const data = await response.json();
       
-      console.log('Full response data:', data);
-      console.log('sessionId from response:', data.sessionId);
-      console.log('sessionId type:', typeof data.sessionId);
+      // console.log('Full response data:', data);
+      // console.log('sessionId from response:', data.sessionId);
+      // console.log('sessionId type:', typeof data.sessionId);
       
       if (!data.success) {
         alert(data.error || 'Failed to start interview');
@@ -143,15 +143,15 @@ const InterviewPage = () => {
       }
 
       if (!data.sessionId) {
-        console.error('CRITICAL: sessionId is missing from response!', { data });
+        // console.error('CRITICAL: sessionId is missing from response!', { data });
         alert('Failed to start interview: Missing session ID in response');
         setIsProcessing(false);
         return;
       }
 
-      console.log('Setting sessionId to:', data.sessionId);
+      // console.log('Setting sessionId to:', data.sessionId);
       setSessionId(data.sessionId);
-      console.log('After setSessionId call - sessionId should be queued for update');
+      // console.log('After setSessionId call - sessionId should be queued for update');
       
       setCurrentQuestion(data.question);
       
@@ -184,7 +184,7 @@ const InterviewPage = () => {
   };
 
   const handleSpeechResult = useCallback(({ final, interim }) => {
-    console.log('handleSpeechResult called:', { final, interim, currentSessionId: sessionId });
+    // console.log('handleSpeechResult called:', { final, interim, currentSessionId: sessionId });
     setInterimTranscript(interim);
     
     if (final.trim()) {
@@ -197,7 +197,7 @@ const InterviewPage = () => {
 
       // Detect end of answer (4 seconds of silence)
       silenceTimerRef.current = setTimeout(() => {
-        console.log('Silence timeout triggered - calling handleAnswerComplete with:', final.trim());
+        // console.log('Silence timeout triggered - calling handleAnswerComplete with:', final.trim());
         if (final.trim()) {
           handleAnswerComplete(final.trim());
         }
@@ -225,7 +225,7 @@ const InterviewPage = () => {
   // Re-initialize speech recognition when sessionId or callbacks change
   useEffect(() => {
     if (isInterviewActive && sessionId) {
-      console.log('Re-initializing speech recognition with updated callbacks');
+      // console.log('Re-initializing speech recognition with updated callbacks');
       const initialized = SpeechService.initRecognition(
         handleSpeechResult,
         handleSpeechError,
@@ -257,12 +257,12 @@ const InterviewPage = () => {
   // };
 
   const handleAnswerComplete = async (answer) => {
-    console.log('Current sessionId value:', sessionId);
-    console.log('sessionId type:', typeof sessionId);
-    console.log('Answer received:', answer);
+    // console.log('Current sessionId value:', sessionId);
+    // console.log('sessionId type:', typeof sessionId);
+    // console.log('Answer received:', answer);
     
     if (!sessionId) {
-      console.error('CRITICAL: No session ID available', { sessionId });
+      // console.error('CRITICAL: No session ID available', { sessionId });
       alert('Error: No session ID available. Please start the interview again.');
       return;
     }
@@ -334,12 +334,12 @@ const InterviewPage = () => {
         
         // Validate that we have a question
         if (!question) {
-          console.error('No question received from server:', data);
+          // console.error('No question received from server:', data);
           alert('Error: No question received from server');
           return;
         }
 
-        console.log('Received new question:', question);
+        // console.log('Received new question:', question);
 
         setCurrentQuestion(question);
         
@@ -406,11 +406,11 @@ const InterviewPage = () => {
                   evaluation: data.evaluation
                 };
 
-                console.log('Interview evaluation:', evaluation);
+                // console.log('Interview evaluation:', evaluation);
 
                 setIsProcessing(false);
                 // Navigate to Users page and pass the analytics payload so it can be displayed
-                navigate('/users', { state: { recentAnalytics: analyticsPayload } });
+                navigate('/user/userid', { state: { recentAnalytics: analyticsPayload } });
 
                 // Stop here since we already navigated away
                 return;

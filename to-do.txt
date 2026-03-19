@@ -1,0 +1,9 @@
+streaming AI responses (no waiting)
+
+real-time answer scoring
+
+emotion detection from webcam
+
+moving from local storage to vectordb
+
+also cannot click other tabs/routes if the session / interview is on

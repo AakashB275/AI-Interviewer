@@ -271,6 +271,66 @@ export const getUserTrainingStatus = async function (req, res) {
   }
 };
 
+export const getUploadStatus = async function (req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required"
+      });
+    }
+
+    const user = await userModel.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    const hasData = user.userTrainingData && user.userTrainingData.hasUploadedData;
+
+    // Get the most recent document for this user
+    let documentId = null;
+    if (hasData) {
+      const latestDocument = await DocumentModel.findOne({
+        'metadata.uploadedBy': req.user._id,
+        isActive: true
+      }).sort({ createdAt: -1 });
+      
+      if (latestDocument) {
+        documentId = latestDocument._id.toString();
+      }
+    }
+
+    // Get list of uploaded files with their details
+    const uploadedFiles = hasData && user.userTrainingData.uploadedFiles 
+      ? user.userTrainingData.uploadedFiles.map(file => ({
+          originalName: file.originalName,
+          filename: file.filename,
+          size: file.size,
+          mimetype: file.mimetype,
+          uploadDate: file.uploadDate
+        }))
+      : [];
+
+    return res.status(200).json({
+      success: true,
+      hasUploadedData: hasData,
+      documentId: documentId,
+      uploadedFiles: uploadedFiles
+    });
+
+  } catch (err) {
+    console.error("Error getting upload status:", err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+  
+}
+
 export const deleteUserFile = async function (req, res) {
   try {
     if (!req.user) {
@@ -368,4 +428,6 @@ export const deleteUserFile = async function (req, res) {
     });
   }
 };
+
+export const uploadTrainData = uploadUserData;
 
