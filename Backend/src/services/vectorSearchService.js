@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import { chunkModel } from '../models/chunks.js';
 import { generateEmbedding } from './embeddingService.js';
 
-
 function cosineSimilarity(vecA, vecB) {
   if (vecA.length !== vecB.length) {
     throw new Error(
@@ -11,27 +10,20 @@ function cosineSimilarity(vecA, vecB) {
       'current embedding provider.'
     );
   }
-
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < vecA.length; i++) {
     dot   += vecA[i] * vecB[i];
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
-
   const denom = Math.sqrt(normA) * Math.sqrt(normB);
   return denom === 0 ? 0 : dot / denom;
 }
 
 class VectorSearchService {
-
-  /**
-   * @private
-   */
   async _atlasSearchByDocument({ documentId, queryEmbedding, limit }) {
     const indexName = process.env.ATLAS_VECTOR_INDEX_NAME || 'chunks_vector_index';
-
-    const docOid = new mongoose.Types.ObjectId(documentId);
+    const docOid    = new mongoose.Types.ObjectId(documentId);
 
     const pipeline = [
       {
@@ -41,7 +33,8 @@ class VectorSearchService {
           queryVector:   queryEmbedding,
           numCandidates: Math.max(limit * 15, 150),
           limit,
-          filter: { documentId: { $eq: docOid } }
+          // Only search active chunks belonging to this document
+          filter: { documentId: { $eq: docOid }, isActive: { $eq: true } }
         }
       },
       {
@@ -60,9 +53,6 @@ class VectorSearchService {
     return chunkModel.aggregate(pipeline);
   }
 
-  /**
-   * @private
-   */
   async _atlasSearchByOwner({ ownerId, queryEmbedding, limit }) {
     const indexName = process.env.ATLAS_VECTOR_INDEX_NAME || 'chunks_vector_index';
     const ownerOid  = new mongoose.Types.ObjectId(String(ownerId));
@@ -75,7 +65,7 @@ class VectorSearchService {
           queryVector:   queryEmbedding,
           numCandidates: Math.max(limit * 15, 150),
           limit,
-          filter: { ownerId: { $eq: ownerOid } }
+          filter: { ownerId: { $eq: ownerOid }, isActive: { $eq: true } }
         }
       },
       {
@@ -93,20 +83,21 @@ class VectorSearchService {
     return chunkModel.aggregate(pipeline);
   }
 
-
   async _cosineSearchByDocument({ documentId, queryEmbedding, limit, section }) {
-    const filter = { documentId };
+    // isActive: true is the critical filter — inactive (soft-deleted) chunks
+    // must never surface in question generation.
+    const filter = { documentId, isActive: true };
     if (section) filter.section = section;
 
     const chunks = await chunkModel.find(filter).lean();
 
     if (!chunks || chunks.length === 0) {
-      console.warn(`No chunks found for documentId: ${documentId}`);
+      console.warn(`No active chunks found for documentId: ${documentId}`);
       return [];
     }
 
     const scored = chunks
-      .map((chunk) => {
+      .map(chunk => {
         if (!chunk.embedding || chunk.embedding.length === 0) {
           console.warn(`Chunk ${chunk._id} has no embedding — skipping`);
           return null;
@@ -118,10 +109,7 @@ class VectorSearchService {
           );
           return null;
         }
-        return {
-          ...chunk,
-          similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
-        };
+        return { ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) };
       })
       .filter(Boolean);
 
@@ -130,11 +118,12 @@ class VectorSearchService {
   }
 
   async _cosineSearchByOwner({ ownerId, queryEmbedding, limit }) {
-    const chunks = await chunkModel.find({ ownerId }).lean();
+    // Same isActive guard for owner-scoped searches
+    const chunks = await chunkModel.find({ ownerId, isActive: true }).lean();
     if (!chunks || chunks.length === 0) return [];
 
     const scored = chunks
-      .map((chunk) => {
+      .map(chunk => {
         if (!chunk.embedding || chunk.embedding.length !== queryEmbedding.length) return null;
         return { ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) };
       })
@@ -144,14 +133,10 @@ class VectorSearchService {
     return scored.slice(0, limit);
   }
 
+
   /**
-   *
-   * @param {Object}  params
-   * @param {string}  params.documentId
-   * @param {string}  params.query       
-   * @param {number}  [params.limit=5]
-   * @param {string}  [params.section]   Optional section filter (cosine mode only)
-   * @returns {Promise<Array>}
+   * Search chunks for a specific document.
+   * Only returns chunks where isActive === true.
    */
   async search({ documentId, query, limit = 5, section = null } = {}) {
     if (!documentId) throw new Error('documentId is required');
@@ -163,18 +148,9 @@ class VectorSearchService {
       const queryEmbedding = await generateEmbedding(query.trim());
 
       if (useAtlas) {
-        // console.log(`[Atlas] $vectorSearch: "${query.slice(0, 60)}" in doc ${documentId}`);
-        const results = await this._atlasSearchByDocument({ documentId, queryEmbedding, limit });
-        // console.log(`[Atlas] found ${results.length} chunks`);
-        return results;
+        return await this._atlasSearchByDocument({ documentId, queryEmbedding, limit });
       }
-
-      // console.log(`[Cosine] search: "${query.slice(0, 60)}" in doc ${documentId}`);
-      const results = await this._cosineSearchByDocument({
-        documentId, queryEmbedding, limit, section
-      });
-      // console.log(`[Cosine] found ${results.length} chunks`);
-      return results;
+      return await this._cosineSearchByDocument({ documentId, queryEmbedding, limit, section });
 
     } catch (error) {
       console.error('Vector search error:', error.message);
@@ -183,16 +159,11 @@ class VectorSearchService {
   }
 
   /**
-   * Search across ALL documents owned by a user.
-   *
-   * @param {Object}  params
-   * @param {string}  params.ownerId
-   * @param {string}  params.query
-   * @param {number}  [params.limit=5]
-   * @returns {Promise<Array>}
+   * Search across all active documents owned by a user.
+   * Only returns chunks where isActive === true.
    */
   async searchByOwner({ ownerId, query, limit = 5 } = {}) {
-    if (!ownerId)             throw new Error('ownerId is required');
+    if (!ownerId) throw new Error('ownerId is required');
     if (!query || !query.trim()) throw new Error('query is required');
 
     const useAtlas = (process.env.USE_ATLAS_VECTOR_SEARCH || 'false').toLowerCase() === 'true';
@@ -201,16 +172,9 @@ class VectorSearchService {
       const queryEmbedding = await generateEmbedding(query.trim());
 
       if (useAtlas) {
-        // console.log(`[Atlas] $vectorSearch by owner ${ownerId}: "${query.slice(0, 60)}"`);
-        const results = await this._atlasSearchByOwner({ ownerId, queryEmbedding, limit });
-        // console.log(`[Atlas] found ${results.length} chunks`);
-        return results;
+        return await this._atlasSearchByOwner({ ownerId, queryEmbedding, limit });
       }
-
-      // console.log(`[Cosine] search by owner ${ownerId}: "${query.slice(0, 60)}"`);
-      const results = await this._cosineSearchByOwner({ ownerId, queryEmbedding, limit });
-      // console.log(`[Cosine] found ${results.length} chunks`);
-      return results;
+      return await this._cosineSearchByOwner({ ownerId, queryEmbedding, limit });
 
     } catch (error) {
       console.error('Vector search by owner error:', error.message);

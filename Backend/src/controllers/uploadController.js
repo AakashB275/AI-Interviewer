@@ -1,167 +1,97 @@
-import multer from 'multer';
 import userModel from '../models/user.js';
 import { DocumentModel } from '../models/document.js';
 import { chunkModel } from '../models/chunks.js';
-import { extractTextFromFile } from '../services/documentParser.js';
+import { extractTextFromBuffer } from '../services/documentParser.js';
 import { generateEmbedding } from '../services/embeddingService.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, '../../uploads/user-data');
-    
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain',
-    'application/json'
-  ];
-  
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only PDF, DOC, DOCX, TXT, and JSON files are allowed.'), false);
-  }
-};
-
-export const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: fileFilter
-});
 
 function chunkText(text, size = 800, overlap = 120) {
   if (!text || !text.trim()) return [];
   const words = text.split(/\s+/);
   const chunks = [];
   let start = 0;
-
   while (start < words.length) {
-    const chunkWords = words.slice(start, start + size);
-    chunks.push(chunkWords.join(' ').trim());
+    chunks.push(words.slice(start, start + size).join(' ').trim());
     start += size - overlap;
   }
-
   return chunks;
 }
 
-export const uploadUserData = async function(req, res) {
-    try{
-        if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required"
-      });
+// POST /api/upload/train-data
+export const uploadUserData = async function (req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "No files uploaded"
-      });
+      return res.status(400).json({ success: false, error: 'No files uploaded' });
     }
+
     const { dataType, description } = req.body;
     const userId = req.user._id;
 
-    // Process uploaded files
-    const uploadedFiles = req.files.map(file => ({
-      originalName: file.originalname,
-      filename: file.filename,
-      path: file.path,
-      size: file.size,
-      mimetype: file.mimetype,
-      uploadDate: new Date()
-    }));
-
     const user = await userModel.findById(userId);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found"
-      });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Initialize userTrainingData if it doesn't exist
     if (!user.userTrainingData) {
       user.userTrainingData = {
         hasUploadedData: false,
-        uploadedFiles: [],
-        lastUpdated: null
+        uploadedFiles:   [],
+        lastUpdated:     null
       };
     }
 
-    // Add new files to user's training data
-    user.userTrainingData.uploadedFiles.push(...uploadedFiles);
-    user.userTrainingData.hasUploadedData = true;
-    user.userTrainingData.lastUpdated = new Date();
-    user.userTrainingData.dataType = dataType || 'general';
-    user.userTrainingData.description = description || '';
-
-    await user.save();
-
     const documentResults = [];
-    for (const file of uploadedFiles) {
-      const { text, mimeType } = await extractTextFromFile({
-        filePath: file.path,
-        mimeType: file.mimetype,
-        originalName: file.originalName
+
+    for (const file of req.files) {
+      const { text } = await extractTextFromBuffer({
+        buffer:       file.buffer,
+        mimeType:     file.mimetype,
+        originalName: file.originalname
       });
 
       if (!text || !text.trim()) {
-        throw new Error(`No readable text extracted from ${file.originalName}`);
+        return res.status(422).json({
+          success: false,
+          error: `No readable text could be extracted from "${file.originalname}". Please upload a text-based PDF or DOCX.`
+        });
       }
 
+      //Upload the whole document to MongoDB
+      const fileExt = file.originalname.includes('.')
+        ? file.originalname.slice(file.originalname.lastIndexOf('.') + 1).toLowerCase()
+        : 'unknown';
+
       const document = await DocumentModel.create({
-        title: file.originalName,
-        content: text,
-        fileType: path.extname(file.originalName).replace('.', '').toLowerCase(),
-        mimeType: mimeType || file.mimetype,
-        originalFileName: file.originalName,
+        title:            file.originalname,
+        content:          text,
+        fileType:         fileExt,
+        mimeType:         file.mimetype,
+        originalFileName: file.originalname,
         metadata: {
-          fileSize: file.size,
+          fileSize:   file.size,
           uploadedBy: userId
         }
       });
 
       const textChunks = chunkText(text);
-      const chunkDocs = [];
+      const chunkDocs  = [];
 
       for (let i = 0; i < textChunks.length; i++) {
         const chunkTextValue = textChunks[i];
-        const embedding = await generateEmbedding(chunkTextValue);
+        const embedding      = await generateEmbedding(chunkTextValue);
         chunkDocs.push({
-          documentId: document._id,
-          ownerId: userId,
-          chunkText: chunkTextValue,
+          documentId:     document._id,
+          ownerId:        userId,
+          chunkText:      chunkTextValue,
           embedding,
-          section: 'other',
-          embeddingModel: 'text-embedding-3-small',
-          embeddingDim: embedding.length,
-          position: i
+          section:        'other',
+          embeddingModel: process.env.EMBEDDING_PROVIDER || 'huggingface',
+          embeddingDim:   embedding.length,
+          position:       i,
+          isActive:       true
         });
       }
 
@@ -169,265 +99,209 @@ export const uploadUserData = async function(req, res) {
         await chunkModel.insertMany(chunkDocs);
       }
 
+      user.userTrainingData.uploadedFiles.push({
+        originalName: file.originalname,
+        filename:     document._id.toString(),
+        size:         file.size,
+        mimetype:     file.mimetype,
+        uploadDate:   new Date(),
+        isActive:     true
+      });
+
       documentResults.push({
         documentId: document._id,
         chunkCount: chunkDocs.length,
-        title: document.title
+        title:      document.title
       });
     }
 
+    user.userTrainingData.hasUploadedData = true;
+    user.userTrainingData.lastUpdated     = new Date();
+    user.userTrainingData.dataType        = dataType || 'general';
+    user.userTrainingData.description     = description || '';
+    await user.save();
+
     return res.status(200).json({
       success: true,
-      message: "Files uploaded successfully",
-      uploadedFiles: uploadedFiles.map(file => ({
-        originalName: file.originalName,
-        size: file.size,
-        uploadDate: file.uploadDate
+      message: 'Files uploaded and processed successfully',
+      uploadedFiles: req.files.map(f => ({
+        originalName: f.originalname,
+        size:         f.size,
+        uploadDate:   new Date()
       })),
-      totalFiles: user.userTrainingData.uploadedFiles.length,
+      totalFiles:       user.userTrainingData.uploadedFiles.filter(f => f.isActive !== false).length,
       documentsCreated: documentResults
     });
 
-    }
-    catch(err){
-        console.error("Error in file upload:", err.message);
-    
-    // Clean up uploaded files if database operation failed
-    if (req.files) {
-      req.files.forEach(file => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-      });
-    }
-    
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-};
-
-export const getUserTrainingStatus = async function (req, res) {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required"
-      });
-    }
-
-    const user = await userModel.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found"
-      });
-    }
-
-    const hasData = user.userTrainingData && user.userTrainingData.hasUploadedData;
-    const fileCount = hasData ? user.userTrainingData.uploadedFiles.length : 0;
-
-    // Get the most recent document for this user
-    let documentId = null;
-    if (hasData) {
-      const latestDocument = await DocumentModel.findOne({
-        'metadata.uploadedBy': req.user._id,
-        isActive: true
-      }).sort({ createdAt: -1 });
-      
-      if (latestDocument) {
-        documentId = latestDocument._id.toString();
-      }
-    }
-
-    // Get list of uploaded files with their details
-    const uploadedFiles = hasData && user.userTrainingData.uploadedFiles 
-      ? user.userTrainingData.uploadedFiles.map(file => ({
-          originalName: file.originalName,
-          filename: file.filename,
-          size: file.size,
-          mimetype: file.mimetype,
-          uploadDate: file.uploadDate
-        }))
-      : [];
-
-    return res.status(200).json({
-      success: true,
-      hasUploadedData: hasData,
-      fileCount: fileCount,
-      lastUpdated: hasData ? user.userTrainingData.lastUpdated : null,
-      dataType: hasData ? user.userTrainingData.dataType : null,
-      documentId: documentId,
-      uploadedFiles: uploadedFiles
-    });
-
   } catch (err) {
-    console.error("Error getting training status:", err.message);
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error('Error in file upload:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
 
+// GET /api/upload/status
 export const getUploadStatus = async function (req, res) {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required"
-      });
+      return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
     const user = await userModel.findById(req.user._id);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found"
-      });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const hasData = user.userTrainingData && user.userTrainingData.hasUploadedData;
+    // Filter out soft-deleted files before sending to the client
+    const activeFiles = (user.userTrainingData?.uploadedFiles || [])
+      .filter(f => f.isActive !== false);
 
-    // Get the most recent document for this user
+    const hasData  = activeFiles.length > 0;
     let documentId = null;
+
     if (hasData) {
-      const latestDocument = await DocumentModel.findOne({
+      const latest = await DocumentModel.findOne({
         'metadata.uploadedBy': req.user._id,
         isActive: true
       }).sort({ createdAt: -1 });
-      
-      if (latestDocument) {
-        documentId = latestDocument._id.toString();
-      }
+      if (latest) documentId = latest._id.toString();
     }
 
-    // Get list of uploaded files with their details
-    const uploadedFiles = hasData && user.userTrainingData.uploadedFiles 
-      ? user.userTrainingData.uploadedFiles.map(file => ({
-          originalName: file.originalName,
-          filename: file.filename,
-          size: file.size,
-          mimetype: file.mimetype,
-          uploadDate: file.uploadDate
-        }))
-      : [];
-
     return res.status(200).json({
-      success: true,
+      success:         true,
       hasUploadedData: hasData,
-      documentId: documentId,
-      uploadedFiles: uploadedFiles
+      documentId,
+      uploadedFiles:   activeFiles.map(f => ({
+        originalName: f.originalName,
+        filename:     f.filename,
+        size:         f.size,
+        mimetype:     f.mimetype,
+        uploadDate:   f.uploadDate
+      }))
     });
 
   } catch (err) {
-    console.error("Error getting upload status:", err.message);
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error('Error getting upload status:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
-  
-}
+};
 
+// GET /api/upload/training-status
+export const getUserTrainingStatus = async function (req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    const user = await userModel.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const activeFiles = (user.userTrainingData?.uploadedFiles || [])
+      .filter(f => f.isActive !== false);
+
+    const hasData  = activeFiles.length > 0;
+    let documentId = null;
+
+    if (hasData) {
+      const latest = await DocumentModel.findOne({
+        'metadata.uploadedBy': req.user._id,
+        isActive: true
+      }).sort({ createdAt: -1 });
+      if (latest) documentId = latest._id.toString();
+    }
+
+    return res.status(200).json({
+      success:         true,
+      hasUploadedData: hasData,
+      fileCount:       activeFiles.length,
+      lastUpdated:     hasData ? user.userTrainingData.lastUpdated : null,
+      dataType:        hasData ? user.userTrainingData.dataType    : null,
+      documentId,
+      uploadedFiles:   activeFiles.map(f => ({
+        originalName: f.originalName,
+        filename:     f.filename,
+        size:         f.size,
+        mimetype:     f.mimetype,
+        uploadDate:   f.uploadDate
+      }))
+    });
+
+  } catch (err) {
+    console.error('Error getting training status:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// DELETE /api/upload/file/:filename
 export const deleteUserFile = async function (req, res) {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required"
-      });
+      return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
-    const { filename } = req.params;
+    const { filename } = req.params; // filename === documentId
     const userId = req.user._id;
 
     const user = await userModel.findById(userId);
     if (!user || !user.userTrainingData) {
-      return res.status(404).json({
-        success: false,
-        error: "No training data found"
-      });
+      return res.status(404).json({ success: false, error: 'No training data found' });
     }
 
-    // Find and remove file from database
+    // Confirm this file belongs to the requesting user
     const fileIndex = user.userTrainingData.uploadedFiles.findIndex(
-      file => file.filename === filename
+      f => f.filename === filename
+    );
+    if (fileIndex === -1) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
+    const updatedDoc = await DocumentModel.findOneAndUpdate(
+      { _id: filename, 'metadata.uploadedBy': userId },
+      { $set: { isActive: false } },
+      { new: true }
     );
 
-    if (fileIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        error: "File not found"
-      });
+    if (!updatedDoc) {
+      console.warn(`Document ${filename} not found or not owned by user ${userId}`);
     }
 
-    const fileToDelete = user.userTrainingData.uploadedFiles[fileIndex];
-    
-    // Find and delete associated document and chunks
-    // Find document by original filename
-    const document = await DocumentModel.findOne({
-      'metadata.uploadedBy': userId,
-      originalFileName: fileToDelete.originalName,
-      isActive: true
-    });
+    await chunkModel.updateMany(
+      { documentId: filename, ownerId: userId },
+      { $set: { isActive: false } }
+    );
 
-    if (document) {
-      // Delete all chunks associated with this document
-      await chunkModel.deleteMany({ documentId: document._id });
-      
-      // Mark document as inactive (soft delete) or delete it
-      document.isActive = false;
-      await document.save();
-    }
-    
-    // Delete physical file
-    if (fs.existsSync(fileToDelete.path)) {
-      fs.unlinkSync(fileToDelete.path);
-    }
+    user.userTrainingData.uploadedFiles[fileIndex].isActive = false;
 
-    // Remove from database
-    user.userTrainingData.uploadedFiles.splice(fileIndex, 1);
-    
-    // Update hasUploadedData status
-    if (user.userTrainingData.uploadedFiles.length === 0) {
-      user.userTrainingData.hasUploadedData = false;
-      user.userTrainingData.lastUpdated = null;
-    } else {
-      user.userTrainingData.lastUpdated = new Date();
-    }
-    
+    // Recompute hasUploadedData from remaining active files only
+    const activeFiles = user.userTrainingData.uploadedFiles.filter(
+      f => f.isActive !== false
+    );
+    user.userTrainingData.hasUploadedData = activeFiles.length > 0;
+    user.userTrainingData.lastUpdated     = new Date();
     await user.save();
 
-    // Get the new latest document ID after deletion
+    // Return the new latest active documentId so the frontend can update state
     let newLatestDocumentId = null;
-    if (user.userTrainingData.uploadedFiles.length > 0) {
-      const latestDocument = await DocumentModel.findOne({
+    if (activeFiles.length > 0) {
+      const latest = await DocumentModel.findOne({
         'metadata.uploadedBy': userId,
         isActive: true
       }).sort({ createdAt: -1 });
-      
-      if (latestDocument) {
-        newLatestDocumentId = latestDocument._id.toString();
-      }
+      if (latest) newLatestDocumentId = latest._id.toString();
     }
 
     return res.status(200).json({
-      success: true,
-      message: "File deleted successfully",
-      remainingFiles: user.userTrainingData.uploadedFiles.length,
-      documentId: newLatestDocumentId
+      success:        true,
+      message:        'File removed successfully',
+      remainingFiles: activeFiles.length,
+      documentId:     newLatestDocumentId
     });
 
   } catch (err) {
-    console.error("Error deleting file:", err.message);
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error('Error removing file:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
 
 export const uploadTrainData = uploadUserData;
-

@@ -1,13 +1,9 @@
-import fs from 'fs/promises';
-import path from 'path';
 import mammoth from 'mammoth';
 import { createRequire } from 'module';
 
-// Use createRequire to interop with CommonJS / hybrid builds of pdf-parse
 const require = createRequire(import.meta.url);
 const pdfParseModule = require('pdf-parse');
 
-// Normalise possible shapes: function export, default export, or named export
 const pdfParse =
   typeof pdfParseModule === 'function'
     ? pdfParseModule
@@ -18,42 +14,57 @@ const pdfParse =
     : null;
 
 /**
- * Pure extraction service: extracts raw text from supported files.
- * - Does NOT perform any AI reasoning or inference.
- * - Deterministic and testable.
- *
- * @param {{filePath:string, mimeType?:string, originalName?:string}} options
- * @returns {Promise<{text:string, mimeType?:string, originalName?:string}>}
+ * @param {{buffer: Buffer, mimeType?: string, originalName?: string}} options
+ * @returns {Promise<{text: string, mimeType?: string, originalName?: string}>}
  */
-export async function extractTextFromFile({ filePath, mimeType, originalName } = {}) {
-	if (!filePath) throw new Error('filePath is required');
+export async function extractTextFromBuffer({ buffer, mimeType, originalName } = {}) {
+  if (!buffer || !Buffer.isBuffer(buffer)) {
+    throw new Error('A valid Buffer is required');
+  }
 
-	const ext = path.extname(filePath).toLowerCase();
-	try {
-		if (ext === '.pdf' || (mimeType && mimeType.includes('pdf'))) {
-			if (!pdfParse) {
-				throw new Error('pdfParse module could not be initialised');
-			}
-			const dataBuffer = await fs.readFile(filePath);
-			const parsed = await pdfParse(dataBuffer);
-			const text = parsed?.text || '';
-			return { text, mimeType: 'application/pdf', originalName };
-		}
+  const ext = originalName
+    ? originalName.slice(originalName.lastIndexOf('.')).toLowerCase()
+    : '';
 
-		if (ext === '.docx' || ext === '.doc' || (mimeType && mimeType.includes('word'))) {
-			const buffer = await fs.readFile(filePath);
-			const res = await mammoth.extractRawText({ buffer });
-			return { text: res.value || '', mimeType: mimeType || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', originalName };
-		}
+  try {
+    // ── PDF ────────────────────────────────────────────────────────────────
+    if (ext === '.pdf' || (mimeType && mimeType.includes('pdf'))) {
+      if (!pdfParse) throw new Error('pdfParse module could not be initialised');
+      const parsed = await pdfParse(buffer);
+      return {
+        text: parsed?.text || '',
+        mimeType: 'application/pdf',
+        originalName
+      };
+    }
 
-		// Fallback to plain text read
-		const txt = await fs.readFile(filePath, { encoding: 'utf8' });
-		return { text: txt, mimeType: mimeType || 'text/plain', originalName };
-	} catch (err) {
-		const e = new Error(`Failed to extract text: ${err.message}`);
-		e.cause = err;
-		throw e;
-	}
+    // ── DOCX / DOC ─────────────────────────────────────────────────────────
+    if (
+      ext === '.docx' ||
+      ext === '.doc' ||
+      (mimeType && mimeType.includes('word'))
+    ) {
+      const res = await mammoth.extractRawText({ buffer });
+      return {
+        text: res.value || '',
+        mimeType:
+          mimeType ||
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        originalName
+      };
+    }
+
+    // ── Plain text / JSON fallback ─────────────────────────────────────────
+    return {
+      text: buffer.toString('utf8'),
+      mimeType: mimeType || 'text/plain',
+      originalName
+    };
+  } catch (err) {
+    const e = new Error(`Failed to extract text from ${originalName || 'file'}: ${err.message}`);
+    e.cause = err;
+    throw e;
+  }
 }
 
-export default { extractTextFromFile };
+export default { extractTextFromBuffer };

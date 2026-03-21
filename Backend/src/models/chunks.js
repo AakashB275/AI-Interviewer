@@ -1,12 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
-
-// export interface IChunk extends Document {
-//   documentId: mongoose.Types.ObjectId;
-//   ownerId: mongoose.Types.ObjectId;
-//   chunkText: string;
-//   embedding: number[];
-//   position: number;
-// }
+import mongoose, { Schema } from "mongoose";
 
 const chunkSchema = new Schema(
   {
@@ -29,24 +21,32 @@ const chunkSchema = new Schema(
       required: true
     },
     section: {
-        type: String,
-        enum: ["education", "experience", "projects", "skills", "summary", "other"],
-        index: true
+      type: String,
+      enum: ["education", "experience", "projects", "skills", "summary", "other"],
+      index: true
     },
     embeddingModel: {
-    type: String,
-    required: true
-  },
-  embeddingDim: {
-    type: Number,
-    required: true
-  },
+      type: String,
+      required: true
+    },
+    embeddingDim: {
+      type: Number,
+      required: true
+    },
     position: {
       type: Number,
       default: 0
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true
     }
   },
   { timestamps: true }
 );
+
+chunkSchema.index({ documentId: 1, isActive: 1 });
+chunkSchema.index({ ownerId: 1,   isActive: 1 });
 
 export const chunkModel = mongoose.model("chunks", chunkSchema);
