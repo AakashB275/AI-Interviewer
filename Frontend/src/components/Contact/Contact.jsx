@@ -3,6 +3,7 @@ import { FaTwitter, FaLinkedin, FaInstagram } from "react-icons/fa";
 import { MdEmail } from "react-icons/md";
 import { FiPhone } from "react-icons/fi";
 import { NavLink } from "react-router-dom";
+import { apiFetch } from "../../context/apiFetch";
 
 function Contact() {
   const [formData, setFormData] = useState({
@@ -69,11 +70,8 @@ function Contact() {
     setErrors({});
     
     try {
-      const response = await fetch("/api/contact/submit", {
+      const response = await apiFetch("/api/contact/submit", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(formData)
       });
 

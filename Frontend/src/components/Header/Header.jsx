@@ -2,6 +2,7 @@ import React, { useState} from "react";
 import ThemeToggle from "../ui/theme-toggle";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
+import { apiFetch } from "../../context/apiFetch";
 import {
   Card,
   CardHeader,
@@ -34,7 +35,7 @@ function Header() {
 
   const handleLogout = () => {
     // call backend logout and clear local state
-    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).finally(() => {
+    apiFetch('/api/auth/logout', { method: 'POST' }).finally(() => {
       logout();
     });
   };
@@ -171,10 +172,8 @@ function Header() {
               </button>
               <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition" onClick={async () => {
                 try {
-                  const res = await fetch(`${API_BASE}/api/auth/login`, {
+                  const res = await apiFetch('/api/auth/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
                     body: JSON.stringify({ userName: loginForm.userName, password: loginForm.password })
                   });
                   const data = await parseResponseSafe(res);
@@ -289,10 +288,8 @@ function Header() {
               </button>
               <button className="px-4 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition" onClick={async () => {
                 try {
-                  const res = await fetch(`${API_BASE}/api/auth/register`, {
+                  const res = await apiFetch('/api/auth/register', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
                     body: JSON.stringify({ userName: registerForm.userName, email: registerForm.email, contact: registerForm.contact, password: registerForm.password })
                   });
                   const data = await parseResponseSafe(res);

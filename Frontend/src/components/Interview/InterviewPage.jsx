@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
 import { useAuth } from '../../context/useAuth';
+import { apiFetch } from '../../context/apiFetch';
 import femaleInterviewerImage from '../../assets/young interviewer.png';
 
 const InterviewPage = () => {
@@ -57,7 +58,7 @@ const InterviewPage = () => {
     const fetchUserData = async () => {
       if (!user) {
         try {
-          const response = await fetch('/api/auth/me', { credentials: 'include' });
+          const response = await apiFetch('/api/auth/me');
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.user) {
@@ -105,10 +106,8 @@ const InterviewPage = () => {
     setIsProcessing(true);
 
     try {
-      const response = await fetch('/api/interview/start', {
+      const response = await apiFetch('/api/interview/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ documentId, role: jobRole })
       });
 
@@ -189,10 +188,8 @@ const InterviewPage = () => {
     setInterimTranscript('');
 
     try {
-      const response = await fetch('/api/interview/answer', {
+      const response = await apiFetch('/api/interview/answer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ sessionId: currentSessionId, answer })
       });
 
@@ -296,10 +293,8 @@ const InterviewPage = () => {
 
     if (currentSessionId) {
       try {
-        const response = await fetch('/api/interview/end', {
+        const response = await apiFetch('/api/interview/end', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ sessionId: currentSessionId })
         });
 

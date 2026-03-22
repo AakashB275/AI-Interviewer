@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../../context/apiFetch';
 
 export default function AdminDashboard(){
   const [stats, setStats] = useState(null);
@@ -9,7 +10,7 @@ export default function AdminDashboard(){
     const fetchStats = async ()=>{
       setLoading(true);
       try{
-        const res = await fetch('/api/analytics/platform', { credentials: 'include' });
+        const res = await apiFetch('/api/analytics/platform');
         if (!res.ok) {
           const d = await res.json().catch(()=>({}));
           throw new Error(d.error || 'Failed to load platform stats');

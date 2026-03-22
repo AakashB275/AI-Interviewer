@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
+import { apiFetch } from '../../context/apiFetch';
 import { 
   Play, 
   Brain, 
@@ -131,13 +132,7 @@ function Home() {
   // Check resume status
   const checkResumeStatus = async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/upload/status', {
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiFetch('/api/upload/status');
       
       if (response.ok) {
         const data = await response.json();
@@ -412,11 +407,9 @@ function Home() {
                   }
 
                   try {
-                    const response = await fetch('/api/auth/login', {
+                    const response = await apiFetch('/api/auth/login', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ userName: username, password }),
-                      credentials: 'include'
+                      body: JSON.stringify({ userName: username, password })
                     });
 
                     if (response.ok) {

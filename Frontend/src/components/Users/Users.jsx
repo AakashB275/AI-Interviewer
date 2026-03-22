@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/useAuth';
+import { apiFetch } from '../../context/apiFetch';
 import { useLocation } from 'react-router-dom';
 import { 
   User, 
@@ -55,9 +56,7 @@ function Users() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include'
-      });
+      const response = await apiFetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.user) {
@@ -71,9 +70,7 @@ function Users() {
 
   const fetchResumeStatus = async () => {
     try {
-      const response = await fetch('/api/upload/status', {
-        credentials: 'include'
-      });
+      const response = await apiFetch('/api/upload/status');
       
       if (response.ok) {
         const data = await response.json();
@@ -107,9 +104,8 @@ function Users() {
 
     setDeletingFile(filename);
     try {
-      const response = await fetch(`/api/upload/file/${filename}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await apiFetch(`/api/upload/file/${filename}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -161,10 +157,8 @@ function Users() {
     }
     setSavingName(true);
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await apiFetch('/api/auth/me', {
         method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userName: newUserName.trim() })
       });
       const data = await res.json();
@@ -194,9 +188,7 @@ function Users() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/analytics/me', {
-        credentials: 'include'
-      });
+      const response = await apiFetch('/api/analytics/me');
       
       if (response.ok) {
         const data = await response.json();

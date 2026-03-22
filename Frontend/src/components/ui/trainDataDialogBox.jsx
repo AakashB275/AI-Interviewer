@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../../context/apiFetch';
 import {
   Upload,
   X,
@@ -22,8 +23,7 @@ import {
 
 function TrainAIDialog({ isOpen, onClose }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [dataType, setDataType] = useState('general');
+  const dataType = 'general';
   const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
@@ -43,9 +43,7 @@ function TrainAIDialog({ isOpen, onClose }) {
 
   const fetchTrainingStatus = async () => {
     try {
-      const response = await fetch('/api/upload/status', {
-        credentials: 'include'
-      });
+      const response = await apiFetch('/api/upload/status');
       
       // Check if response is OK and content type is JSON
       if (!response.ok) {
@@ -154,10 +152,9 @@ function TrainAIDialog({ isOpen, onClose }) {
       formData.append('dataType', dataType);
       formData.append('description', description);
 
-      const response = await fetch('/api/upload/train-data', {
+      const response = await apiFetch('/api/upload/train-data', {
         method: 'POST',
-        body: formData,
-        credentials: 'include'
+        body: formData
       });
 
       const data = await response.json();
