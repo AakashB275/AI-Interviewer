@@ -1,7 +1,7 @@
 import React, { useState} from "react";
 import ThemeToggle from "../ui/theme-toggle";
 import { NavLink } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import {
   Card,
   CardHeader,

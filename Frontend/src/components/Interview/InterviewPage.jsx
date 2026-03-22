@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mic, MicOff, Video, VideoOff, Square, MessageSquare, Brain } from 'lucide-react';
 import SpeechService from '../../services/SpeechService';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import femaleInterviewerImage from '../../assets/young interviewer.png';
 
 const InterviewPage = () => {
