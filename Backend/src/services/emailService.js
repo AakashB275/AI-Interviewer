@@ -1,5 +1,4 @@
-import nodemailer from 'nodemailer';
-
+import * as nodemailer from 'nodemailer';
 // Create transporter — works with Gmail, Outlook, or any SMTP
 function createTransporter() {
   // For Gmail: enable "App Passwords" in your Google account

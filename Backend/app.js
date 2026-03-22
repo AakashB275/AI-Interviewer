@@ -40,6 +40,7 @@ const limiter = rateLimit({
 
 app.use(limiter);
 app.use(requestLogger);
+app.set('trust proxy', 1);
 
 console.log('✅ Rate limiting configured');
 
