@@ -28,19 +28,25 @@ export default function OAuthCallback() {
         const response = await fetch('/api/users/auth/exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include cookies in request
           body: JSON.stringify({ code })
         });
 
         if (!response.ok) {
-          throw new Error('Failed to exchange authorization code');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to exchange authorization code');
         }
 
         const data = await response.json();
-        login(data.token, data.user);
-        navigate('/home');
+        if (data.success) {
+          login(data.token, data.user);
+          navigate('/home');
+        } else {
+          throw new Error(data.error || 'Sign-in failed');
+        }
       } catch (err) {
-        console.error('OAuth exchange error:', err);
-        alert('Sign-in failed. Please try again.');
+        console.error('OAuth exchange error:', err.message);
+        alert(`Sign-in failed: ${err.message}`);
         navigate('/');
       }
     })();
