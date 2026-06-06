@@ -8,7 +8,9 @@ export default function OAuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const code = searchParams.get('code');
+    const token = searchParams.get('token');
+    const userName = searchParams.get('userName');
+    const userId = searchParams.get('userId');
     const error = searchParams.get('error');
 
     if (error) {
@@ -17,40 +19,13 @@ export default function OAuthCallback() {
       return;
     }
 
-    if (!code) {
+    if (token) {
+      login(token, { userName, _id: userId });
+      navigate('/home');
+    } else {
       navigate('/');
-      return;
     }
-
-    // Exchange the authorization code for a JWT token
-    fetch(`${import.meta.env.VITE_API_URL}/api/auth/exchange`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // Include cookies in request
-      body: JSON.stringify({ code })
-    })
-      .then(async (r) => {
-        // Safe JSON parse — won't crash on empty response
-        const text = await r.text();
-        const data = text ? JSON.parse(text) : {};
-
-        if (r.ok && data.success) {
-          login(data.token, data.user);
-          navigate('/home');
-        } else {
-          console.error('Exchange failed:', data.error || r.status);
-          alert('Sign-in failed: ' + (data.error || 'Please try again'));
-          navigate('/');
-        }
-      })
-      .catch((err) => {
-        console.error('OAuth exchange error:', err);
-        alert('Sign-in failed. Please try again.');
-        navigate('/');
-      });
-  }, [searchParams, login, navigate]);
-
-  
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

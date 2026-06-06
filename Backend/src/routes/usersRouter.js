@@ -1,9 +1,8 @@
 import express from 'express';
 import isLoggedin from '../middlewares/isLoggedin.js';
-import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser, exchangeOAuthCode } from '../controllers/authController.js';
+import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser } from '../controllers/authController.js';
 import passport from '../services/passportConfig.js';
 import jwt from 'jsonwebtoken';
-import { generateAuthCode } from '../utils/authCodeStore.js';
 
 const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
 
@@ -20,7 +19,7 @@ router.post('/register', registerUser );
 router.post('/login', loginUser );
 
 // Frontend calls this endpoint to exchange authorization code for JWT
-router.post('/exchange', exchangeOAuthCode);
+router.post('/auth/exchange', exchangeOAuthCode);
 
 router.get('/google',
     passport.authenticate('google', {
@@ -29,6 +28,7 @@ router.get('/google',
     })
 );
 
+s
 router.get('/google/callback',
     passport.authenticate('google', {
         failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?error=oauth_failed`,
