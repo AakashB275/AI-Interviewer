@@ -20,7 +20,7 @@ router.post('/register', registerUser );
 router.post('/login', loginUser );
 
 // Frontend calls this endpoint to exchange authorization code for JWT
-router.post('/auth/exchange', exchangeOAuthCode);
+router.post('/exchange', exchangeOAuthCode);
 
 router.get('/google',
     passport.authenticate('google', {
