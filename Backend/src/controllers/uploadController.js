@@ -240,7 +240,7 @@ export const deleteUserFile = async function (req, res) {
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
-    const { filename } = req.params; // filename === documentId
+    const { filename } = req.params;
     const userId = req.user._id;
 
     const user = await userModel.findById(userId);
@@ -270,7 +270,7 @@ export const deleteUserFile = async function (req, res) {
       { documentId: filename, ownerId: userId },
       { $set: { isActive: false } }
     );
-
+    //This is where file is soft-deleted
     user.userTrainingData.uploadedFiles[fileIndex].isActive = false;
 
     // Recompute hasUploadedData from remaining active files only

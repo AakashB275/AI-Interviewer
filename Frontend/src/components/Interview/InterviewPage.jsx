@@ -260,7 +260,7 @@ const InterviewPage = () => {
         if (fullAnswer) {
           handleAnswerComplete(fullAnswer);
         }
-      }, 10000);
+      }, 8000);
     }
   }, [handleAnswerComplete]);
 

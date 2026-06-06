@@ -1,7 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // Attach the stored token to every fetch call automatically.
-// Usage: apiFetch('/api/auth/me') — identical to fetch() but with auth header.
+// apiFetch('/api/auth/me') identical to fetch() but with auth header.
 export function apiFetch(path, options = {}) {
   const token = localStorage.getItem('authToken');
   const headers = {

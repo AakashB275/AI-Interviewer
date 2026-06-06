@@ -1,20 +1,16 @@
 import * as nodemailer from 'nodemailer';
-// Create transporter — works with Gmail, Outlook, or any SMTP
 function createTransporter() {
-  // For Gmail: enable "App Passwords" in your Google account
-  // (Google Account → Security → 2-Step Verification → App Passwords)
+
   return nodemailer.createTransporter({
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth: {
-      user: process.env.EMAIL_USER,     // your-email@gmail.com
-      pass: process.env.EMAIL_PASS      // your app password (NOT your real password)
+      user: process.env.EMAIL_USER,     
+      pass: process.env.EMAIL_PASS      
     }
   });
 }
 
-/**
- * Send welcome/confirmation email after registration
- */
+
 export async function sendWelcomeEmail({ to, userName }) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn('Email credentials not configured — skipping welcome email');
@@ -26,7 +22,7 @@ export async function sendWelcomeEmail({ to, userName }) {
   const mailOptions = {
     from: `"TrainMeAI" <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'Welcome to TrainMeAI! 🎉',
+    subject: 'Welcome to TrainMeAI!',
     html: `
       <!DOCTYPE html>
       <html>

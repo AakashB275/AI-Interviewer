@@ -33,8 +33,8 @@ class VectorSearchService {
           queryVector:   queryEmbedding,
           numCandidates: Math.max(limit * 15, 150),
           limit,
-          // Only search active chunks belonging to this document
-          filter: { documentId: { $eq: docOid }, isActive: { $eq: true } }
+          // Only search active chunks belonging to this document with matching embedding dimension
+          filter: { documentId: { $eq: docOid }, isActive: { $eq: true }, embeddingDim: { $eq: queryEmbedding.length } }
         }
       },
       {
@@ -65,7 +65,7 @@ class VectorSearchService {
           queryVector:   queryEmbedding,
           numCandidates: Math.max(limit * 15, 150),
           limit,
-          filter: { ownerId: { $eq: ownerOid }, isActive: { $eq: true } }
+          filter: { ownerId: { $eq: ownerOid }, isActive: { $eq: true }, embeddingDim: { $eq: queryEmbedding.length } }
         }
       },
       {
@@ -86,7 +86,8 @@ class VectorSearchService {
   async _cosineSearchByDocument({ documentId, queryEmbedding, limit, section }) {
     // isActive: true is the critical filter — inactive (soft-deleted) chunks
     // must never surface in question generation.
-    const filter = { documentId, isActive: true };
+    // embeddingDim must match the query embedding length to avoid dimension mismatches.
+    const filter = { documentId, isActive: true, embeddingDim: queryEmbedding.length };
     if (section) filter.section = section;
 
     const chunks = await chunkModel.find(filter).lean();
@@ -102,13 +103,6 @@ class VectorSearchService {
           console.warn(`Chunk ${chunk._id} has no embedding — skipping`);
           return null;
         }
-        if (chunk.embedding.length !== queryEmbedding.length) {
-          console.warn(
-            `Dimension mismatch on chunk ${chunk._id}: ` +
-            `stored=${chunk.embedding.length}, query=${queryEmbedding.length} — skipping`
-          );
-          return null;
-        }
         return { ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) };
       })
       .filter(Boolean);
@@ -118,13 +112,13 @@ class VectorSearchService {
   }
 
   async _cosineSearchByOwner({ ownerId, queryEmbedding, limit }) {
-    // Same isActive guard for owner-scoped searches
-    const chunks = await chunkModel.find({ ownerId, isActive: true }).lean();
+    // Same isActive guard for owner-scoped searches, with embeddingDim filter for dimension matching
+    const chunks = await chunkModel.find({ ownerId, isActive: true, embeddingDim: queryEmbedding.length }).lean();
     if (!chunks || chunks.length === 0) return [];
 
     const scored = chunks
       .map(chunk => {
-        if (!chunk.embedding || chunk.embedding.length !== queryEmbedding.length) return null;
+        if (!chunk.embedding || chunk.embedding.length === 0) return null;
         return { ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) };
       })
       .filter(Boolean);

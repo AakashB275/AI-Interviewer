@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { sendWelcomeEmail } from '../services/emailService.js';
+import { exchangeAuthCode } from '../utils/authCodeStore.js';
 
 dotenv.config();
 
@@ -52,7 +53,13 @@ export const registerUser = async function (req, res) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await userModel.create({ email, userName, password: hashedPassword, contact });
+    const user = await userModel.create({ 
+      email, 
+      userName, 
+      password: hashedPassword, 
+      contact,
+      authProvider: 'local'
+    });
 
     sendWelcomeEmail({ to: user.email, userName: user.userName }).catch(err =>
       console.error('Background email error:', err.message)
@@ -80,9 +87,15 @@ export const loginUser = async function (req, res) {
       return res.status(400).json({ success: false, error: 'Username and password are required' });
     }
 
-    const user = await userModel.findOne({ userName });
+    const user = await userModel.findOne({ userName }).select('+password');
     if (!user) return res.status(401).json({ error: 'Username or Password incorrect' });
 
+    // OAuth users should not log in with username/password
+    if (user.authProvider === 'google') {
+      return res.status(401).json({ error: 'This account uses Google Sign-In. Please use Google to log in.' });
+    }
+
+    // Check password for local auth users
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Username or Password incorrect' });
 
@@ -145,6 +158,32 @@ export const updateCurrentUser = async function (req, res) {
   } catch (err) {
     console.error('Error updating user:', err);
     return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Front-end exchanges the one-time code (from URL) for a real JWT token
+export const exchangeOAuthCode = async function (req, res) {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    const tokenData = exchangeAuthCode(code);
+    if (!tokenData) {
+      return res.status(400).json({ error: 'Invalid or expired authorization code' });
+    }
+
+    res.cookie('token', tokenData.token, cookieOptions());
+    return res.status(200).json({
+      success: true,
+      token: tokenData.token,
+      user: tokenData.user
+    });
+  } catch (err) {
+    console.error('Error in OAuth code exchange:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 };
 

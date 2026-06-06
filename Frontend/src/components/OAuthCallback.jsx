@@ -8,9 +8,7 @@ export default function OAuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const userName = searchParams.get('userName');
-    const userId = searchParams.get('userId');
+    const code = searchParams.get('code');
     const error = searchParams.get('error');
 
     if (error) {
@@ -19,13 +17,34 @@ export default function OAuthCallback() {
       return;
     }
 
-    if (token) {
-      login(token, { userName, _id: userId });
-      navigate('/home');
-    } else {
+    if (!code) {
       navigate('/');
+      return;
     }
-  }, []);
+
+    // Exchange the authorization code for a JWT token
+    (async () => {
+      try {
+        const response = await fetch('/api/users/auth/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to exchange authorization code');
+        }
+
+        const data = await response.json();
+        login(data.token, data.user);
+        navigate('/home');
+      } catch (err) {
+        console.error('OAuth exchange error:', err);
+        alert('Sign-in failed. Please try again.');
+        navigate('/');
+      }
+    })();
+  }, [searchParams, login, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

@@ -18,14 +18,22 @@ const userSchema = mongoose.Schema({
   password: {
     type: String,
     required: function () {
-      return !(this.userTrainingData && this.userTrainingData.googleId);
+      // Password required only for local auth users
+      return this.authProvider === 'local';
     },
-    minlength: 6
+    minlength: 6,
+    select: false // never include password in queries by default
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   contact: {
     type: String,
     required: function () {
-      return !(this.userTrainingData && this.userTrainingData.googleId);
+      // Contact optional for OAuth users
+      return this.authProvider === 'local';
     }
   },
   userTrainingData: {

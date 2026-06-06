@@ -1,10 +1,6 @@
 import InterviewSession from '../models/interviewSession.js';
 
-/**
- * Thin session lifecycle manager.
- * - Only handles create/read/update/end for sessions.
- * - No planning or question-selection logic here.
- */
+
 export async function createSession({ userId, metadata = {} } = {}) {
 	if (!userId) throw new Error('userId is required');
 	// This app's session model requires documentId/role/difficulty/interviewPlan.

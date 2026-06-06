@@ -1,8 +1,9 @@
 import express from 'express';
 import isLoggedin from '../middlewares/isLoggedin.js';
-import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser } from '../controllers/authController.js';
+import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser, exchangeOAuthCode } from '../controllers/authController.js';
 import passport from '../services/passportConfig.js';
 import jwt from 'jsonwebtoken';
+import { generateAuthCode } from '../utils/authCodeStore.js';
 
 const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
 
@@ -18,9 +19,9 @@ router.get('/', (req, res) => {
 router.post('/register', registerUser );
 router.post('/login', loginUser );
 
-// ── Google OAuth routes ──────────────────────────────────────────
+// Frontend calls this endpoint to exchange authorization code for JWT
+router.post('/auth/exchange', exchangeOAuthCode);
 
-// Step 1: Redirect user to Google's login page
 router.get('/google',
     passport.authenticate('google', {
         scope: ['profile', 'email'],
@@ -28,7 +29,6 @@ router.get('/google',
     })
 );
 
-// Step 2: Google redirects back here after user approves
 router.get('/google/callback',
     passport.authenticate('google', {
         failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?error=oauth_failed`,
@@ -41,15 +41,19 @@ router.get('/google/callback',
             { expiresIn: '7d' }
         );
 
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+        // Generate a one-time authorization code instead of exposing token in URL
+        const code = generateAuthCode({
+            token,
+            user: {
+                id: req.user._id,
+                email: req.user.email,
+                userName: req.user.userName
+            }
         });
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        res.redirect(`${frontendUrl}/oauth-callback?token=${token}&userName=${encodeURIComponent(req.user.userName)}&userId=${req.user._id}`);
+        // URL only contains a 30-second throwaway code, not the actual token
+        res.redirect(`${frontendUrl}/oauth-callback?code=${code}`);
     }
 );
 

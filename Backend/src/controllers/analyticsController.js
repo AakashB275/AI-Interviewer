@@ -4,9 +4,6 @@ import interviewMessageService from '../services/interviewMessageService.js';
 import User from '../models/user.js';
 import Evaluation from '../models/evaluation.js';
 
-/**
- * Returns simple user-level analytics: total sessions and evaluation aggregates
- */
 export async function getUserStats(req, res) {
 	try {
 		const userId = req.user && req.user._id;
@@ -66,7 +63,6 @@ export async function getUserStats(req, res) {
 
 export async function getPlatformStats(req, res) {
 	try {
-		// platform stats: total users, sessions, evaluations, and aggregate scores
 		const allSessions = await sessionService.getAllSessions?.() || [];
 		const totalSessions = Array.isArray(allSessions) ? allSessions.length : 0;
 

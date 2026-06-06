@@ -20,6 +20,7 @@ const evaluationSchema = new mongoose.Schema({
     confidence: { type: Number, min: 0, max: 10 },
     overall: { type: Number, min: 0, max: 10 }
   },
+  comments: String,
 
   isActive: { type: Boolean, default: true },
   version: { type: Number, default: 1 },

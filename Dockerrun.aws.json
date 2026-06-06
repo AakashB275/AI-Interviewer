@@ -1,0 +1,27 @@
+{
+  "AWSEBDockerrunVersion": 1,
+  "Image": {
+    "Name": "ai-interviewer-backend",
+    "Update": true
+  },
+  "Ports": [
+    {
+      "ContainerPort": 3000,
+      "HostPort": 80
+    }
+  ],
+  "Logging": {
+    "Image": "awslogs",
+    "Enabled": true,
+    "LogDriver": "awslogs",
+    "Options": {
+      "awslogs-group": "/aws/elasticbeanstalk/ai-interviewer",
+      "awslogs-region": "us-east-1",
+      "awslogs-stream-prefix": "docker"
+    }
+  },
+  "Environment": {
+    "NODE_ENV": "production",
+    "TZ": "Asia/Kolkata"
+  }
+}

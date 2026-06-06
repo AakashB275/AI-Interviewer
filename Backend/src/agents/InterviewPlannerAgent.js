@@ -21,10 +21,8 @@ export class InterviewPlannerAgent {
     let questionCount = this.constraints.questionCount;
     
     if (!questionCount) {
-      // Base: 1 warmup + 3 core skill questions + 1 wrapup = 5 minimum
       const baseQuestions = 5;
-      // Add 1 extra question for each additional skill detected
-      const skillBonus = Math.min(skills.length - 1, 2); // Cap at +2 for max 7 questions
+      const skillBonus = Math.math(Math.max(skills.length - 1,0), 2);
       questionCount = baseQuestions + skillBonus;
     }
 
@@ -44,9 +42,9 @@ export class InterviewPlannerAgent {
       let skill;
 
       if (i === 0) {
-        skill = 'general'; // warmup
+        skill = 'general'; 
       } else if (i === questionCount - 1) {
-        skill = 'general'; // wrap-up
+        skill = 'general'; 
       } else {
         // Distribute core skills across the middle questions
         skill = coreSkills[(i - 1) % coreSkills.length];

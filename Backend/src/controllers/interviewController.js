@@ -12,16 +12,14 @@ import vectorSearchService from '../services/vectorSearchService.js';
  * Fetch resume chunks relevant to a given skill/query from vector search.
  * Returns empty array (never throws) so a vector search failure never
  * breaks the interview — it just falls back to generic questions.
- *
- * @param {string} documentId
- * @param {string} query       - skill name or topic to search for
- * @param {number} limit
- */
+**/
+
 async function getResumeChunks(documentId, query, limit = 4) {
   if (!documentId || !query) return [];
   try {
     const chunks = await vectorSearchService.search({ documentId, query, limit });
     // console.log(`Vector search for "${query}": found ${chunks.length} chunks`);
+    console.log(`Generating personalized questions..`);
     return chunks || [];
   } catch (err) {
     // Vector search failure must NEVER crash the interview
@@ -30,10 +28,6 @@ async function getResumeChunks(documentId, query, limit = 4) {
   }
 }
 
-/**
- * START INTERVIEW
- * Creates a session and returns the first personalized question
- */
 export async function startInterview(req, res) {
   try {
     const userId = req.user?._id;
@@ -44,8 +38,8 @@ export async function startInterview(req, res) {
       return res.status(400).json({ success: false, error: 'documentId and role are required' });
     }
 
-    const document = await DocumentModel.findById(documentId);
-    if (!document) return res.status(404).json({ success: false, error: 'Document not found' });
+    const document = await DocumentModel.findOne({ _id: documentId, 'metadata.uploadedBy': userId });
+    if (!document) return res.status(404).json({ success: false, error: 'Document not found or unauthorized' });
 
     const resumeAnalysisAgent = new ResumeAnalysisAgent({
       text: document.content,
@@ -53,19 +47,8 @@ export async function startInterview(req, res) {
     });
     const resumeAnalysis = await resumeAnalysisAgent.run();
 
-    // console.log('Resume Analysis:', {
-    //   years:  resumeAnalysis.estimatedYearsExperience,
-    //   skills: resumeAnalysis.skills
-    // });
-
     const planner = new InterviewPlannerAgent({ resumeAnalysis, constraints: { role } });
     const interviewPlan = planner.run();
-
-    // console.log('Interview Plan:', {
-    //   questionCount: interviewPlan.questionCount,
-    //   difficulty:    interviewPlan.baseDifficulty,
-    //   skills:        interviewPlan.detectedSkills
-    // });
 
     const years = Number(resumeAnalysis.estimatedYearsExperience || 0);
     const difficulty = years >= 5 ? 'hard' : years >= 2 ? 'medium' : 'easy';
@@ -120,8 +103,6 @@ export async function startInterview(req, res) {
       });
     }
 
-    console.log('First question generated:', question.text.slice(0, 80) + '...');
-
     session.currentQuestion = {
       text:       question.text,
       competency: question.competency,
@@ -152,10 +133,8 @@ export async function startInterview(req, res) {
   }
 }
 
-/**
- * SUBMIT ANSWER
- * Evaluates answer depth, then returns a personalised next question or follow-up
- */
+//Submit Answer 
+
 export async function submitAnswer(req, res) {
   try {
     const userId = req.user?._id;
@@ -228,14 +207,13 @@ export async function submitAnswer(req, res) {
           resumeChunks                         
         });
       } catch (err) {
-        console.warn('Follow-up generation failed, using fallback:', err.message);
-        followUpQuestion = {
-          text: isBriefAnswer
-            ? 'Can you provide more details about that? What tools or approaches did you use?'
-            : 'That\'s interesting — can you tell me more about the outcome or challenges you faced?',
-          competency: followUpSkill,
-          difficulty: session.difficulty
-        };
+        console.warn('Follow-up generation failed, using deterministic fallback:', err.message);
+        followUpQuestion = generateDeterministicQuestion({
+          skill:      followUpSkill,
+          difficulty: session.difficulty,
+          role:       session.role,
+          index:      session.currentQuestionIndex
+        });
       }
 
       await interviewMessageService.saveMessage({
@@ -345,9 +323,7 @@ export async function submitAnswer(req, res) {
   }
 }
 
-/**
- * END INTERVIEW
- */
+// END INTERVIEW
 export async function endInterview(req, res) {
   try {
     const userId    = req.user?._id;
@@ -409,9 +385,6 @@ export async function endInterview(req, res) {
   }
 }
 
-/**
- * GET USER SESSIONS
- */
 export async function getUserSessions(req, res) {
   try {
     const userId = req.user?._id;

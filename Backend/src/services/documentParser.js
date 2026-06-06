@@ -13,10 +13,7 @@ const pdfParse =
     ? pdfParseModule.pdfParse
     : null;
 
-/**
- * @param {{buffer: Buffer, mimeType?: string, originalName?: string}} options
- * @returns {Promise<{text: string, mimeType?: string, originalName?: string}>}
- */
+
 export async function extractTextFromBuffer({ buffer, mimeType, originalName } = {}) {
   if (!buffer || !Buffer.isBuffer(buffer)) {
     throw new Error('A valid Buffer is required');
@@ -27,7 +24,6 @@ export async function extractTextFromBuffer({ buffer, mimeType, originalName } =
     : '';
 
   try {
-    // ── PDF ────────────────────────────────────────────────────────────────
     if (ext === '.pdf' || (mimeType && mimeType.includes('pdf'))) {
       if (!pdfParse) throw new Error('pdfParse module could not be initialised');
       const parsed = await pdfParse(buffer);
@@ -38,7 +34,6 @@ export async function extractTextFromBuffer({ buffer, mimeType, originalName } =
       };
     }
 
-    // ── DOCX / DOC ─────────────────────────────────────────────────────────
     if (
       ext === '.docx' ||
       ext === '.doc' ||
@@ -54,7 +49,6 @@ export async function extractTextFromBuffer({ buffer, mimeType, originalName } =
       };
     }
 
-    // ── Plain text / JSON fallback ─────────────────────────────────────────
     return {
       text: buffer.toString('utf8'),
       mimeType: mimeType || 'text/plain',

@@ -4,3 +4,4 @@ production.json
 .env
 node_modules
 .env.docker.example
+node_modules

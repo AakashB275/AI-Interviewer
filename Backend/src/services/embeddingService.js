@@ -63,8 +63,7 @@ export async function generateEmbeddingHuggingFace(text) {
   const token = process.env.HF_API_TOKEN;
   if (!token) {
     throw new Error(
-      'HF_API_TOKEN is not set. ' +
-      'Get a free read-only token at https://huggingface.co/settings/tokens'
+      'HF_API_TOKEN is not set. '
     );
   }
 
@@ -122,12 +121,12 @@ export async function generateEmbeddingTransformers(text) {
       pipeline = mod.pipeline;
     } catch {
       throw new Error(
-        '@xenova/transformers is not installed. ' +
-        'Run: cd Backend && npm install @xenova/transformers'
+        '@xenova/transformers is not installed. '
+        // 'Run: cd Backend && npm install @xenova/transformers'
       );
     }
 
-    console.log('Loading local embedding model (first run downloads ~25 MB, then cached)...');
+    // console.log('Loading local embedding model (first run downloads ~25 MB, then cached)...');
     _transformerPipeline = await pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2'
@@ -136,7 +135,7 @@ export async function generateEmbeddingTransformers(text) {
   }
 
   const output = await _transformerPipeline(text, { pooling: 'mean', normalize: true });
-  const embedding = Array.from(output.data); // Float32Array → plain JS Array
+  const embedding = Array.from(output.data); 
 
   if (!embedding || embedding.length === 0) {
     throw new Error('Empty embedding from @xenova/transformers');
@@ -146,12 +145,7 @@ export async function generateEmbeddingTransformers(text) {
   return embedding;
 }
 
-/**
- * Generate embedding via a locally running Ollama instance.
- * Install Ollama : https://ollama.ai
- * Pull model     : ollama pull nomic-embed-text
- * Output         : 768-dim float array
- */
+
 export async function generateEmbeddingOllama(text) {
   const baseUrl = process.env.OLLAMA_BASE_URL  || 'http://localhost:11434';
   const model   = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';

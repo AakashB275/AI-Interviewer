@@ -1,10 +1,6 @@
 import Evaluation from '../models/evaluation.js';
 
-/**
- * Persistence and aggregation service for evaluations.
- * - Stores evaluation payloads and computes simple aggregates.
- * - Does NOT perform any LLM or subjective scoring logic.
- */
+
 export async function saveEvaluation({ sessionId, evaluator = 'system', scores = {}, comments = '' } = {}) {
 	if (!sessionId) throw new Error('sessionId is required');
 	const ev = await Evaluation.create({ session: sessionId, evaluator, scores, comments });

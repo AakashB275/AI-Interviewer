@@ -3,7 +3,7 @@ class SpeechService {
     this.recognition = null;
     this.synthesis = window.speechSynthesis;
     this.isListening = false;
-    this.onInterruptCallback = null; // Callback when user interrupts AI
+    this.onInterruptCallback = null; 
   }
 
   initRecognition(onResult, onError, onInterrupt) {
@@ -33,7 +33,6 @@ class SpeechService {
         }
       }
 
-      // Detect if user is speaking while AI is speaking (interrupt)
       if (this.synthesis && this.synthesis.speaking && (finalTranscript.trim() || interimTranscript.trim())) {
         console.log('🛑 User interrupt detected - stopping AI speech');
         this.stopSpeaking();
@@ -78,7 +77,6 @@ class SpeechService {
     return false;
   }
 
-  // Text-to-speech for AI responses with natural voice modulation
   speak(text, options = {}) {
     return new Promise((resolve, reject) => {
       if (!this.synthesis) {
@@ -86,25 +84,22 @@ class SpeechService {
         return;
       }
 
-      // Cancel any ongoing speech
       this.synthesis.cancel();
 
-      // Enhance text with natural pauses and emphasis
-      const enhancedText = this._enhanceText(text, options);
+      // const enhancedText = this._enhanceText(text, options);
       
-      // Default options for natural human speech
       const defaultOptions = {
         lang: 'en-US',
-        rate: 0.95,        // Slightly slower for clarity (normal human ~0.9-1.1)
-        pitch: 1.0,        // Natural pitch
+        rate: 0.95,        
+        pitch: 1.0,        
         volume: 1.0,
-        voiceIndex: 0      // Use default voice
+        voiceIndex: 0      
       };
 
       const finalOptions = { ...defaultOptions, ...options };
 
       // Split text into chunks for voice variation
-      const chunks = enhancedText.split('||PAUSE||');
+      const chunks = this.split('||PAUSE||');
       let chunkIndex = 0;
 
       const speakChunk = () => {
@@ -128,10 +123,8 @@ class SpeechService {
         utterance.pitch = this._getVariablePitch(chunk, finalOptions.pitch);
         utterance.volume = finalOptions.volume;
 
-        // Try to use a natural voice if available
         const voices = this.synthesis.getVoices();
         if (voices.length > 0) {
-          // Prefer female voice for friendlier tone, or use system default
           const femaleVoice = voices.find(v => v.name.includes('Female') || v.name.includes('woman'));
           if (femaleVoice) {
             utterance.voice = femaleVoice;
@@ -158,36 +151,9 @@ class SpeechService {
     });
   }
 
-  /**
-   * Enhance text with natural pauses and emphasis
-   * @private
-   */
-  _enhanceText(text = {}) {
-    let enhanced = text;
 
-    // Add pauses after punctuation for natural flow
-    enhanced = enhanced.replace(/([.!?])\s+/g, '$1||PAUSE||');
-    
-    // Add longer pause after question marks to seem thoughtful
-    enhanced = enhanced.replace(/\?(\|\|PAUSE\|\|)?/g, '?||PAUSE||PAUSE||');
-
-    // Add slight pauses after commas for lists
-    enhanced = enhanced.replace(/,\s+/g, ', ');
-
-    // Mark certain words for emphasis (slower speech)
-    const emphasisWords = ['specifically', 'importantly', 'furthermore', 'however', 'therefore'];
-    emphasisWords.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      enhanced = enhanced.replace(regex, `**${word}**`);
-    });
-
-    return enhanced;
-  }
-
-  /**
-   * Get variable speech rate based on content
-   * @private
-   */
+   //Get variable speech rate based on content
+   
   _getVariableRate(text, baseRate = 0.95) {
     // Speak numbers and technical terms slower
     if (/\d+|algorithm|database|architecture|performance/.test(text)) {
@@ -208,10 +174,9 @@ class SpeechService {
     return Math.min(1.1, baseRate + 0.05);
   }
 
-  /**
-   * Get variable pitch based on content
-   * @private
-   */
+
+   // Get variable pitch based on content
+   
   _getVariablePitch(text, basePitch = 1.0) {
     // Slightly higher pitch at end of questions for natural intonation
     if (text.trim().endsWith('?')) {

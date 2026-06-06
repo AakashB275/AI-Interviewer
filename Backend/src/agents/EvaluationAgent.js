@@ -2,7 +2,6 @@
  * EvaluationAgent
  * - Deterministic, heuristic evaluator
  * - NOT a semantic judge of competence
- * - Produces conservative signals, not verdicts
  */
 export class EvaluationAgent {
   constructor({ transcript = '', rubric = {} } = {}) {
@@ -27,7 +26,6 @@ export class EvaluationAgent {
         if (this.transcript.includes(k.toLowerCase())) negativeHits++;
       });
 
-      // Conservative heuristic scoring
       let score = 0;
       if (positiveHits > 0) score = Math.min(5, positiveHits);
       if (negativeHits > 0) score = Math.max(0, score - negativeHits);
@@ -45,7 +43,6 @@ export class EvaluationAgent {
       type: 'HeuristicEvaluation',
       scores,
       overallScore: overall,
-      // Conservative, bounded confidence to prevent misuse as "ground truth"
       confidenceLevel: values.length ? 0.35 : 0.3,
       notes:
         'Heuristic keyword-based signal, not semantic competence score. Scores indicate keyword-signal presence, not proficiency.'

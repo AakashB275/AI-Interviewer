@@ -40,11 +40,13 @@ passport.use(new GoogleStrategy(
       user = await userModel.create({
         email,
         userName,
-        // OAuth users have no password — use a placeholder that can never be bcrypt-matched
-        password: `OAUTH_GOOGLE_${profile.id}`,
-        contact: 'not provided',  // matches your required field
-        googleId: profile.id,
-        avatar: profile.photos?.[0]?.value || null
+        authProvider: 'google',
+        // Do NOT set password for OAuth users
+        contact: 'not provided',  // optional for OAuth users, but include if available
+        userTrainingData: {
+          googleId: profile.id,
+          avatar: profile.photos?.[0]?.value || null
+        }
       });
 
       // Send welcome email for new OAuth signups too

@@ -104,13 +104,10 @@ function formatResumeContext(resumeChunks = []) {
 
 class LLMService {
 
-  /**
-   * Generate initial interview question using resume context
-   * @param {Object} params
-   * @param {string} params.role
-   * @param {string} params.difficulty
-   * @param {Array}  params.resumeChunks - relevant chunks from vector search
-   */
+  
+   // Generate initial interview question using resume context
+   // relevant chunks from vector search
+   
   async generateQuestion({ role, difficulty = 'medium', resumeChunks = [] } = {}) {
     if (!role) throw new Error('role is required');
 
@@ -156,9 +153,22 @@ Respond ONLY with:
     }
   }
 
-  /**
-   * Evaluate candidate's answer
-   */
+
+
+async extractResumeData({ systemPrompt, userPrompt } = {}) {
+  if (!systemPrompt || !userPrompt) {
+    throw new Error('systemPrompt and userPrompt are required');
+  }
+
+  return await callLLM({
+    systemPrompt,
+    userPrompt,
+    temperature: 0.1,    // low temperature = more consistent/deterministic output
+    maxTokens:   800,    // skills list doesn't need many tokens
+    jsonMode:    true    // force JSON output where supported (Groq/OpenAI)
+  });
+}
+
   async evaluateAnswer({ question, answer, competency, difficulty = 'medium' } = {}) {
     if (!question || !answer) throw new Error('question and answer are required');
 
@@ -197,9 +207,7 @@ Respond ONLY with:
     }
   }
 
-  /**
-   * Legacy simple follow-up
-   */
+
   async generateFollowUp({ previousQuestion, gaps = [] } = {}) {
     if (!previousQuestion) throw new Error('previousQuestion is required');
 
@@ -217,19 +225,6 @@ Respond with ONLY the question text.`;
     }
   }
 
-  /**
-   * Generate contextual follow-up question using resume chunks
-   * @param {Object} params
-   * @param {string} params.role
-   * @param {string} params.difficulty
-   * @param {string} params.skill
-   * @param {string} params.candidateAnswer
-   * @param {string} params.conversationContext
-   * @param {number} params.questionNumber
-   * @param {number} params.totalQuestions
-   * @param {boolean} params.isFollowUp       
-   * @param {Array}  params.resumeChunks       
-   */
   async generateFollowUpQuestion({
     role = '',
     difficulty = 'medium',
@@ -251,7 +246,7 @@ Respond with ONLY the question text.`;
     let userPrompt;
 
     if (isFollowUp) {
-      // ── Depth-building follow-up on the SAME topic ──────────────────────────
+      // Depth-building follow-up on the SAME topic
       userPrompt = `You are interviewing a candidate for a ${role} position.
 
 Previous Conversation:
