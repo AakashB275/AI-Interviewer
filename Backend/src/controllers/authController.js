@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { sendWelcomeEmail } from '../services/emailService.js';
+import { exchangeAuthCode } from '../utils/authCodeStore.js';
 
 dotenv.config();
 

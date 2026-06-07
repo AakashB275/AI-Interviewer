@@ -19,9 +19,9 @@ import OAuthCallback from './components/OAuthCallback'
 const router  = createBrowserRouter(
   createRoutesFromElements(
     <>
-    {/* Public route (no header/footer) */}
+    {/* Public routes (no header/footer) */}
       <Route path="/" element={<LandingPage />} />
-      
+      <Route path="/oauth-callback" element={<OAuthCallback />} />
 
       {/*After logging in*/}
       <Route path = '/' element = {<Layout/>}>
@@ -33,8 +33,6 @@ const router  = createBrowserRouter(
       <Route path = 'pricing' element = {<Pricing/>}/>
       <Route path = 'interview' element = {<InterviewPage/>}/>
       <Route path = 'admin' element = {<ProtectedRoute><AdminDashboard/></ProtectedRoute>} />
-      <Route path="oauth-callback" element={<OAuthCallback />} />
-      
     </Route>
     </>
   )

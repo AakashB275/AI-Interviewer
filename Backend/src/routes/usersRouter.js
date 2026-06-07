@@ -1,8 +1,9 @@
 import express from 'express';
 import isLoggedin from '../middlewares/isLoggedin.js';
-import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser } from '../controllers/authController.js';
+import { registerUser, loginUser, logoutUser, getCurrentUser, updateCurrentUser, exchangeOAuthCode } from '../controllers/authController.js';
 import passport from '../services/passportConfig.js';
 import jwt from 'jsonwebtoken';
+import { generateAuthCode } from '../utils/authCodeStore.js';
 
 const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
 
@@ -18,8 +19,7 @@ router.get('/', (req, res) => {
 router.post('/register', registerUser );
 router.post('/login', loginUser );
 
-// Frontend calls this endpoint to exchange authorization code for JWT
-router.post('/auth/exchange', exchangeOAuthCode);
+router.post('/exchange', exchangeOAuthCode);
 
 router.get('/google',
     passport.authenticate('google', {
@@ -28,7 +28,6 @@ router.get('/google',
     })
 );
 
-s
 router.get('/google/callback',
     passport.authenticate('google', {
         failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?error=oauth_failed`,
@@ -41,7 +40,6 @@ router.get('/google/callback',
             { expiresIn: '7d' }
         );
 
-        // Generate a one-time authorization code instead of exposing token in URL
         const code = generateAuthCode({
             token,
             user: {
@@ -52,7 +50,6 @@ router.get('/google/callback',
         });
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        // URL only contains a 30-second throwaway code, not the actual token
         res.redirect(`${frontendUrl}/oauth-callback?code=${code}`);
     }
 );
