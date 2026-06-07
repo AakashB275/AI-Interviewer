@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import userModel from '../models/user.js';
 import { DocumentModel } from '../models/document.js';
 import { chunkModel } from '../models/chunks.js';
@@ -256,8 +257,14 @@ export const deleteUserFile = async function (req, res) {
       return res.status(404).json({ success: false, error: 'File not found' });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(filename)) {
+      return res.status(400).json({ success: false, error: 'Invalid file ID' });
+    }
+
+    const documentObjectId = new mongoose.Types.ObjectId(filename);
+
     const updatedDoc = await DocumentModel.findOneAndUpdate(
-      { _id: filename, 'metadata.uploadedBy': userId },
+      { _id: documentObjectId, 'metadata.uploadedBy': userId },
       { $set: { isActive: false } },
       { new: true }
     );
@@ -267,7 +274,7 @@ export const deleteUserFile = async function (req, res) {
     }
 
     await chunkModel.updateMany(
-      { documentId: filename, ownerId: userId },
+      { documentId: documentObjectId, ownerId: userId },
       { $set: { isActive: false } }
     );
     //This is where file is soft-deleted

@@ -7,9 +7,10 @@ import { exchangeAuthCode } from '../utils/authCodeStore.js';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_KEY || process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET or JWT_KEY environment variable must be set');
+function getJwtSecret() {
+  const secret = process.env.JWT_KEY || process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT secret not configured');
+  return secret;
 }
 
 // Cross-domain cookie config.
@@ -188,5 +189,5 @@ export const exchangeOAuthCode = async function (req, res) {
 };
 
 function generateToken(user) {
-  return jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id: user._id, email: user.email }, getJwtSecret(), { expiresIn: '7d' });
 }

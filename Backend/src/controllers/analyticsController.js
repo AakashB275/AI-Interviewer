@@ -9,7 +9,7 @@ export async function getUserStats(req, res) {
 		const userId = req.user && req.user._id;
 		if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-		const sessions = await sessionService.getSessionByUser?.(userId) || [];
+		const sessions = await sessionService.getSessionByUser(userId);
 		const sessionCount = Array.isArray(sessions) ? sessions.length : 0;
 
 		// compute aggregates across sessions' evaluations

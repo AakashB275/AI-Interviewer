@@ -89,6 +89,7 @@ const InterviewPage = () => {
   };
 
   const cleanup = () => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
@@ -125,9 +126,8 @@ const InterviewPage = () => {
         return;
       }
 
-      //keep ref in sync with state
-      setSessionId(data.sessionId);
       sessionIdRef.current = data.sessionId;
+      setSessionId(data.sessionId);
 
       //reset accumulated transcript for new session
       accumulatedTranscriptRef.current = '';

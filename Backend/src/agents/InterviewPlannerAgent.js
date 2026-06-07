@@ -21,8 +21,8 @@ export class InterviewPlannerAgent {
     let questionCount = this.constraints.questionCount;
     
     if (!questionCount) {
-      const baseQuestions = 5;
-      const skillBonus = Math.math(Math.max(skills.length - 1,0), 2);
+      const baseQuestions = 7;
+const skillBonus = Math.min(Math.max(skills.length - 1, 0), 3);
       questionCount = baseQuestions + skillBonus;
     }
 

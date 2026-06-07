@@ -42,11 +42,9 @@ passport.use(new GoogleStrategy(
         userName,
         authProvider: 'google',
         // Do NOT set password for OAuth users
-        contact: 'not provided',  // optional for OAuth users, but include if available
-        userTrainingData: {
-          googleId: profile.id,
-          avatar: profile.photos?.[0]?.value || null
-        }
+        contact: 'not provided',
+        googleId: profile.id,
+        avatar: profile.photos?.[0]?.value || null
       });
 
       // Send welcome email for new OAuth signups too

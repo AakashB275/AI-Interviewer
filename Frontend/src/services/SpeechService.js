@@ -99,8 +99,7 @@ class SpeechService {
       const finalOptions = { ...defaultOptions, ...options };
 
       // Split text into chunks for voice variation
-      const chunks = this.split('||PAUSE||');
-      let chunkIndex = 0;
+      const chunks = text.split('||PAUSE||');      let chunkIndex = 0;
 
       const speakChunk = () => {
         if (chunkIndex >= chunks.length) {

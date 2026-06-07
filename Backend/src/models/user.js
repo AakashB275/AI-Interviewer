@@ -36,6 +36,14 @@ const userSchema = mongoose.Schema({
       return this.authProvider === 'local';
     }
   },
+  googleId: {
+    type: String,
+    sparse: true
+  },
+  avatar: {
+    type: String,
+    default: null
+  },
   userTrainingData: {
     hasUploadedData: {
       type: Boolean,
@@ -66,14 +74,6 @@ const userSchema = mongoose.Schema({
     lastUpdated: {
       type: Date,
       default: Date.now
-    },
-    googleId: {
-      type:   String,
-      sparse: true
-    },
-    avatar: {
-      type:    String,
-      default: null
     }
   }
 });
